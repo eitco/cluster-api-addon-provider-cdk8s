@@ -53,11 +53,11 @@ chmod +x ${TOOL_BIN}/trivy
 rm ${TOOL_BIN}/trivy.tar.gz
 
 # Builds all the container images to be scanned and cleans up changes to ./*manager_image_patch.yaml ./*manager_pull_policy.yaml.
-make REGISTRY=ghcr.io/patricklaabs/cluster-api-addon-provider-cdk8s/cluster-api-cdk8s-controller PULL_POLICY=IfNotPresent TAG=dev docker-build
+make REGISTRY=ghcr.io/eitco/cluster-api-addon-provider-cdk8s/cluster-api-cdk8s-controller PULL_POLICY=IfNotPresent TAG=dev docker-build
 make clean-release-git
 
 # Scan the images
-${TOOL_BIN}/trivy image -q --exit-code 1 --ignore-unfixed --severity MEDIUM,HIGH,CRITICAL ghcr.io/patricklaabs/cluster-api-addon-provider-cdk8s/cluster-api-cdk8s-controller-"${GO_ARCH}":dev && R5=$? || R5=$?
+${TOOL_BIN}/trivy image -q --exit-code 1 --ignore-unfixed --severity MEDIUM,HIGH,CRITICAL ghcr.io/eitco/cluster-api-addon-provider-cdk8s/cluster-api-cdk8s-controller-"${GO_ARCH}":dev && R5=$? || R5=$?
 
 echo ""
 BRed='\033[1;31m'
