@@ -1,0 +1,12 @@
+name: cdk8s
+config:
+  image: ghcr.io/patricklaabs/k8s-staging-cluster-api-cdk8s/cluster-api-cdk8s-controller
+  live_reload_deps:
+    - main.go
+    - go.mod
+    - go.sum
+    - api
+    - controllers
+    - internal
+  label: CAAPC
+  manager_name: caapc-controller-manager

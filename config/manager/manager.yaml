@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+  labels:
+    control-plane: controller-manager
+spec:
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: controller-manager
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - args:
+            - --leader-elect
+            - "--diagnostics-address=:8443"
+            - "--insecure-diagnostics=false"
+            - "--sync-period=10m"
+            - "--v=2"
+          env:
+            - name: XDG_DATA_HOME
+              value: /tmp/xdg/.data
+            - name: XDG_CONFIG_HOME
+              value: /tmp/xdg/.config
+            - name: XDG_STATE_HOME
+              value: /tmp/xdg/.state
+            - name: XDG_CACHE_HOME
+              value: /tmp/xdg/.cache
+            - name: XDG_CONFIG_DIRS
+              value: /tmp/xdg
+            - name: KUBECACHEDIR
+              value: /tmp/.kube/cache
+          image: controller:latest
+          imagePullPolicy: Always
+          name: manager
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            runAsUser: 65532
+            runAsGroup: 65532
+          ports:
+            - containerPort: 9440
+              name: healthz
+              protocol: TCP
+            - containerPort: 8443
+              name: metrics
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - emptyDir: {}
+          name: tmp
+          # TODO(user): Configure the resources accordingly based on the project requirements.
+          # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+          # resources:
+          #   limits:
+          #     cpu: 500m
+          #     memory: 128Mi
+          #   requests:
+          #     cpu: 10m
+          #     memory: 64Mi
+      serviceAccountName: controller-manager
+      terminationGracePeriodSeconds: 10

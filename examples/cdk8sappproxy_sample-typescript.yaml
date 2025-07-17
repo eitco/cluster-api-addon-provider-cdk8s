@@ -1,0 +1,14 @@
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: Cdk8sAppProxy
+metadata:
+  name: cdk8s-sample-app-typescript
+  namespace: default
+spec:
+  gitRepository:
+    url: "https://github.com/eitco/cluster-api-addon-provider-cdk8s"
+    reference: "main"
+    referencePollInterval: "5m"
+    path: "examples/cdk8s-sample-deployment-typescript"
+  clusterSelector: {}
+    # matchLabels:
+      # environment: development

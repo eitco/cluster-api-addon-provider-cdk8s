@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - image: ghcr.io/patricklaabs/cluster-api-addon-provider-cdk8s/cluster-api-cdk8s-controller-arm64:v1.0.0-alpha.1
+        name: manager
