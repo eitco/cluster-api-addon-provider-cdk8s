@@ -213,12 +213,12 @@ endif
 
 # If REGISTRY is not set, default to localhost:5000 to use the kind registry.
 ifndef REGISTRY
-	REGISTRY ?= ghcr.io/patricklaabs/cluster-api-addon-provider-cdk8s
+	REGISTRY ?= ghcr.io/eitco/cluster-api-addon-provider-cdk8s
 endif
 
-PROD_REGISTRY ?= ghcr.io/patricklaabs/cluster-api-addon-provider-cdk8s
+PROD_REGISTRY ?= ghcr.io/eitco/cluster-api-addon-provider-cdk8s
 
-STAGING_REGISTRY ?= ghcr.io/patricklaabs/cluster-api-addon-provider-cdk8s
+STAGING_REGISTRY ?= ghcr.io/eitco/cluster-api-addon-provider-cdk8s
 STAGING_BUCKET ?= artifacts.k8s-staging-cluster-api-cdk8s.appspot.com
 
 # core
@@ -231,7 +231,7 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
 # Next release is: v1.0.0-alpha
-TAG ?= v1.0.0-alpha.1
+TAG ?= v1.0.0-alpha.2
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm arm64
 
@@ -526,7 +526,7 @@ RELEASE_ALIAS_TAG := $(PULL_BASE_REF)
 RELEASE_DIR := out
 RELEASE_NOTES_DIR := _releasenotes
 GIT_REPO_NAME ?= cluster-api-addon-provider-cdk8s
-GIT_ORG_NAME ?= PatrickLaabs
+GIT_ORG_NAME ?= eitco
 USER_FORK ?= $(shell git config --get remote.origin.url | cut -d/ -f4) # only works on https://github.com/<username>/cluster-api-addon-provider-cdk8s.git style URLs
 ifdef USER_FORK
 USER_FORK := $(shell git config --get remote.origin.url | cut -d: -f2 | cut -d/ -f1) # for git@github.com:<username>/cluster-api-addon-provider-cdk8s.git style URLs
