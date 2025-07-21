@@ -1,6 +1,6 @@
 name: cdk8s
 config:
-  image: ghcr.io/eitco/k8s-staging-cluster-api-cdk8s/cluster-api-cdk8s-controller
+  image: ghcr.io/eitco/cluster-api-addon-provider-cdk8s/cluster-api-cdk8s-controller
   live_reload_deps:
     - main.go
     - go.mod
