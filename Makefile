@@ -218,8 +218,8 @@ endif
 
 PROD_REGISTRY ?= ghcr.io/eitco/cluster-api-addon-provider-cdk8s
 
-STAGING_REGISTRY ?= ghcr.io/eitco/cluster-api-addon-provider-cdk8s
-STAGING_BUCKET ?= artifacts.k8s-staging-cluster-api-cdk8s.appspot.com
+STAGING_REGISTRY ?= ghcr.io/eitco/staging-cluster-api-addon-provider-cdk8s
+#STAGING_BUCKET ?= artifacts.k8s-staging-cluster-api-cdk8s.appspot.com
 
 # core
 IMAGE_NAME ?= cluster-api-cdk8s-controller
@@ -231,7 +231,7 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
 # Next release is: v1.0.0-alpha
-TAG ?= v1.0.0-alpha.3
+TAG ?= v1.0.0-alpha.6
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm arm64
 
