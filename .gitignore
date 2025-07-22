@@ -23,8 +23,8 @@ go.work*
 
 # e2e output
 test/e2e/junit.e2e_suite.*.xml
-test/e2e/caaph-e2e-*.yaml
-test/e2e/config/helm-envsubst.yaml
+test/e2e/caapc-e2e-*.yaml
+test/e2e/config/cdk8s-envsubst.yaml
 test/e2e/logs/*
 _artifacts
 

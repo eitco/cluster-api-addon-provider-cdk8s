@@ -29,7 +29,7 @@ TILT_FILE=${TILTD_DIR}/calico_tiltfile
 cat <<EOF > "${TILT_FILE}"
 # -*- mode: Python -*-
 
-# yaml_file = "../../cluster-api-addon-provider-helm/config/samples/calico-cni.yaml" # Commented out old Helm path
+# yaml_file = "../../cluster-api-addon-provider-cdk8s/config/samples/calico-cni.yaml"
 # k8s_yaml(yaml_file) # Commented out as yaml_file is not defined
 
 # Create k8s resource.

@@ -74,19 +74,6 @@ FROM ${deployment_base_image}:${deployment_base_image_tag}
 # Set shell with pipefail option for better error handling
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
-# Install Node.js and cdk8s-cli directly
-# hadolint ignore=DL3015
-#RUN apt-get update && \
-#    apt-get install -y --no-install-recommends ca-certificates=20240203~22.04.1 curl=7.81.0-1ubuntu1.20 && \
-#    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-#    apt-get install -y nodejs=18.19.1-1nodesource1 && \
-#    npm install -g cdk8s-cli@2.200.109 && \
-#    curl -fsSL -o go1.24.4.linux-amd64.tar.gz https://go.dev/dl/go1.24.4.linux-amd64.tar.gz && \
-#    tar -C /usr/local -xzf go1.24.4.linux-amd64.tar.gz && \
-#    rm go1.24.4.linux-amd64.tar.gz && \
-#    apt-get clean && \
-#    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
 RUN apk add --no-cache ca-certificates curl nodejs npm \
     && npm install -g cdk8s-cli@2.200.109 \
     && curl -fsSL -o go1.24.4.linux-amd64.tar.gz https://go.dev/dl/go1.24.4.linux-amd64.tar.gz \

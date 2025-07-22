@@ -2,6 +2,7 @@ package synthesizer
 
 import (
 	"bytes"
+	"context"
 	"github.com/go-logr/logr"
 	"io/fs"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -32,17 +33,17 @@ type KustomizationFile struct {
 }
 
 type Synthesizer interface {
-	Synthesize(directory string, logger logr.Logger) (parsedManifests []*unstructured.Unstructured, err error)
+	Synthesize(directory string, logger logr.Logger, ctx context.Context) (parsedManifests []*unstructured.Unstructured, err error)
 }
 
 // Implementer implements the Synthesizer method.
 type Implementer struct{}
 
-func (i *Implementer) Synthesize(directory string, logger logr.Logger) (parsedManifests []*unstructured.Unstructured, err error) {
+func (i *Implementer) Synthesize(directory string, logger logr.Logger, ctx context.Context) (parsedManifests []*unstructured.Unstructured, err error) {
 	kind := cdk8sType(directory, logger)
 
 	if kind == string(cdk8sTypescript) {
-		npmInstall := exec.Command("npm", "install")
+		npmInstall := exec.CommandContext(ctx, "npm", "install")
 		npmInstall.Dir = directory
 		output, err := npmInstall.CombinedOutput()
 		if err != nil {
@@ -50,7 +51,7 @@ func (i *Implementer) Synthesize(directory string, logger logr.Logger) (parsedMa
 		}
 	}
 
-	synth := exec.Command("cdk8s", "synth")
+	synth := exec.CommandContext(ctx, "cdk8s", "synth")
 	synth.Dir = directory
 	if err := synth.Run(); err != nil {
 		logger.Error(err, "Failed to synth cdk8s application")

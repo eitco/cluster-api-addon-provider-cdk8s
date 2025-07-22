@@ -24,8 +24,6 @@ SHELL:=/usr/bin/env bash
 # Go.
 #
 GO_VERSION ?= $(shell cat go.mod | grep "toolchain" | { read _ v; echo "$${v#go}"; } | grep "[0-9]" || cat go.mod | grep "go " | head -1 | awk '{print $$2}')
-# GO_BASE_CONTAINER ?= docker.io/library/golang
-# GO_CONTAINER_IMAGE ?= $(GO_BASE_CONTAINER):$(GO_VERSION)
 GO_CONTAINER_IMAGE ?= golang:1.24.4
 
 # Use GOPROXY environment variable if set
@@ -79,7 +77,7 @@ OBSERVABILITY_DIR := hack/observability
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 
 # Set --output-base for conversion-gen if we are not within GOPATH
-ifneq ($(abspath $(ROOT_DIR)),$(shell go env GOPATH)/src/github.com/eitco/cluster-api-addon-provider-cdk8s) # Changed to cdk8s
+ifneq ($(abspath $(ROOT_DIR)),$(shell go env GOPATH)/src/github.com/eitco/cluster-api-addon-provider-cdk8s)
 	CONVERSION_GEN_OUTPUT_BASE := --output-base=$(ROOT_DIR)
 else
 	export GOPATH := $(shell go env GOPATH)
@@ -94,8 +92,8 @@ GINKGO_NODES ?= 1
 GINKGO_TIMEOUT ?= 2h
 GINKGO_POLL_PROGRESS_AFTER ?= 60m
 GINKGO_POLL_PROGRESS_INTERVAL ?= 5m
-E2E_CONF_FILE ?= $(ROOT_DIR)/$(TEST_DIR)/e2e/config/cdk8s.yaml # Changed to cdk8s
-E2E_CONF_FILE_ENVSUBST := $(ROOT_DIR)/test/e2e/config/cdk8s-envsubst.yaml # Changed to cdk8s
+E2E_CONF_FILE ?= $(ROOT_DIR)/$(TEST_DIR)/e2e/config/eitco-cdk8s.yaml
+E2E_CONF_FILE_ENVSUBST := $(ROOT_DIR)/test/e2e/config/eitco-cdk8s-envsubst.yaml
 SKIP_RESOURCE_CLEANUP ?= false
 USE_EXISTING_CLUSTER ?= false
 GINKGO_NOCOLOR ?= false
@@ -124,7 +122,8 @@ KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v5
 CLUSTER_API_VERSION := $(call get_go_version,sigs.k8s.io/cluster-api)
 CLUSTER_API_CRD_LOCATION = tmp/cluster-api/crd
 
-MOCKGEN_VER := v0.4.0
+MOCKGEN_PKG := go.uber.org/mock
+MOCKGEN_VER := $(call get_go_version,$(MOCKGEN_PKG))
 MOCKGEN_BIN := mockgen
 MOCKGEN := $(TOOLS_BIN_DIR)/$(MOCKGEN_BIN)-$(MOCKGEN_VER)
 
@@ -203,23 +202,13 @@ TILT_PREPARE := $(abspath $(TOOLS_BIN_DIR)/$(TILT_PREPARE_BIN))
 GOLANGCI_LINT_BIN := golangci-lint
 GOLANGCI_LINT := $(abspath $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN))
 
-# Define Docker related variables. Releases should modify and double check these vars.
-ifneq ($(shell command -v gcloud),)
-	GCLOUD_PROJECT := $(shell gcloud config get-value project 2>/dev/null)
-	ifneq ($(GCLOUD_PROJECT),)
-		REGISTRY ?= gcr.io/$(GCLOUD_PROJECT)
-	endif
-endif
-
 # If REGISTRY is not set, default to localhost:5000 to use the kind registry.
 ifndef REGISTRY
-	REGISTRY ?= ghcr.io/eitco/cluster-api-addon-provider-cdk8s
+	REGISTRY ?= localhost:5000
 endif
 
 PROD_REGISTRY ?= ghcr.io/eitco/cluster-api-addon-provider-cdk8s
-
 STAGING_REGISTRY ?= ghcr.io/eitco/staging-cluster-api-addon-provider-cdk8s
-#STAGING_BUCKET ?= artifacts.k8s-staging-cluster-api-cdk8s.appspot.com
 
 # core
 IMAGE_NAME ?= cluster-api-cdk8s-controller
@@ -230,10 +219,9 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
-# Next release is: v1.0.0-alpha
-TAG ?= v1.0.0-alpha.6
+TAG ?= dev
 ARCH ?= $(shell go env GOARCH)
-ALL_ARCH = amd64 arm arm64
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 # Allow overriding manifest generation destination directory
 MANIFEST_ROOT ?= config
@@ -314,9 +302,19 @@ download-cluster-api-crd: generate-modules ## Run to download Cluster API CRDs f
 	cp -r $(shell go env GOPATH)/pkg/mod/sigs.k8s.io/cluster-api@$(CLUSTER_API_VERSION)/config/crd/bases/cluster.x-k8s.io_clusters.yaml $(CLUSTER_API_CRD_LOCATION)
 	chmod 644 $(CLUSTER_API_CRD_LOCATION)/*
 
-# DOCKER_TEMPLATES was removed as it pointed to deleted Helm e2e data
+DOCKER_TEMPLATES := test/e2e/data/addons-eitco-cdk8s
 
-# generate-e2e-templates and related targets were removed as they used DOCKER_TEMPLATES
+.PHONY: generate-e2e-templates
+generate-e2e-templates: $(KUSTOMIZE) $(addprefix generate-e2e-templates-, v1.5 main) ## Generate cluster templates for all versions
+
+.PHONY: generate-e2e-templates-v1.5
+generate-e2e-templates-v1.5: $(KUSTOMIZE)
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1.5/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1.5/cluster-template.yaml
+
+.PHONY: generate-e2e-templates-main
+generate-e2e-templates-main: $(KUSTOMIZE) ## Generate templates for e2e tests on main branch.
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template.yaml
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template-upgrades --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template-upgrades.yaml
 
 .PHONY: generate-flavors
 generate-flavors: $(KUSTOMIZE)  ## Generate template flavors.
@@ -423,7 +421,7 @@ ARTIFACTS ?= ${ROOT_DIR}/_artifacts
 KUBEBUILDER_ASSETS ?= $(shell $(SETUP_ENVTEST) use --use-env -p path $(KUBEBUILDER_ENVTEST_KUBERNETES_VERSION))
 
 .PHONY: install-tools # populate hack/tools/bin
-install-tools: $(ENVSUBST) $(KUSTOMIZE) $(GINKGO) # Should kubectl be added here? # Removed HELM
+install-tools: $(ENVSUBST) $(KUSTOMIZE) $(GINKGO) # Should kubectl be added here?
 
 .PHONY: test
 test: $(SETUP_ENVTEST) download-cluster-api-crd ## Run unit and integration tests
@@ -442,10 +440,8 @@ test-junit: $(SETUP_ENVTEST) $(GOTESTSUM) ## Run unit and integration tests and 
 .PHONY: test-cover
 test-cover: ## Run unit and integration tests and generate a coverage report
 	$(MAKE) test TEST_ARGS="$(TEST_ARGS) -coverprofile=out/coverage.out"
-	mkdir out
 	go tool cover -func=out/coverage.out -o out/coverage.txt
 	go tool cover -html=out/coverage.out -o out/coverage.html
-
 
 .PHONY: test-e2e
 test-e2e: ## Run `docker-build` and `docker-push` rules then run e2e tests.
@@ -479,7 +475,23 @@ test-e2e-run: ## Run the end-to-end tests and set controller image and pull poli
 
 .PHONY: get-e2e-kubeconfig
 get-e2e-kubeconfig: ## Get the kubeconfig for the e2e cluster
-	@kind get kubeconfig --name capcdk8s-e2e
+	@kind get kubeconfig --name caapc-e2e
+
+## --------------------------------------
+## Pull Request CI Targets
+## --------------------------------------
+
+.PHONY: pr-ci-tests
+pr-ci-tests: ## Run the CI Tests for Pull Requests
+	./scripts/ci-test.sh
+
+.PHONY: pr-ci-verify
+pr-ci-verify: ## Run the CI Verify for Pull Requests
+	./scripts/ci-verify.sh
+
+.PHONY: pr-ci-e2e-tests
+pr-ci-e2e-tests: ## Run the CI E2E Tests for Pull Requests
+	./scripts/ci-e2e.sh
 
 ## --------------------------------------
 ## Deployment
@@ -601,8 +613,6 @@ release-staging-nightly: ## Tag and push container images to the staging bucket.
 	$(MAKE) manifest-modification REGISTRY=$(STAGING_REGISTRY) RELEASE_TAG=$(NEW_RELEASE_ALIAS_TAG)
 	## Build the manifests
 	$(MAKE) release-manifests
-	# Example manifest location: artifacts.k8s-staging-cluster-api-helm.appspot.com/components/nightly_main_20210121/bootstrap-components.yaml
-	gsutil cp $(RELEASE_DIR)/* gs://$(STAGING_BUCKET)/components/$(NEW_RELEASE_ALIAS_TAG)
 
 .PHONY: release-alias-tag
 release-alias-tag: ## Add the release alias tag to the last build tag
@@ -663,12 +673,12 @@ set-manifest-image:
 ##@ clean:
 
 .PHONY: clean
-clean: ## Remove generated binaries, GitBook files, Helm charts, and Tilt build files
+clean: ## Remove generated binaries, GitBook files and Tilt build files
 	$(MAKE) clean-bin
 
 .PHONY: clean-kind
 clean-kind: ## Cleans up the kind cluster from e2e tests
-	kind delete cluster --name=caaph-e2e || true
+	kind delete cluster --name=caapc-e2e || true
 
 .PHONY: clean-bin
 clean-bin: ## Remove all generated binaries
@@ -761,7 +771,7 @@ $(GOLANGCI_LINT_BIN): $(GOLANGCI_LINT) ## Build a local copy of golangci-lint
 .PHONY: $(GINKGO_BIN)
 $(GINKGO_BIN): $(GINKGO) ## Build a local copy of ginkgo
 
-.PHONY: $(GINKGO_BIN) # Removed HELM_BIN target
+.PHONY: $(GINKGO_BIN)
 $(GINKGO_BIN): $(GINKGO) ## Build a local copy of ginkgo
 
 $(CONTROLLER_GEN): # Build controller-gen from tools folder.

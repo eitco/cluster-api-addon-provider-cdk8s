@@ -1,0 +1,21 @@
+name: pr-e2e-test.yml
+on:
+  pull_request:
+    types:
+      - labeled
+      - synchronize
+      - opened
+      - reopened
+
+jobs:
+  run-e2e-tests:
+    if: contains(github.event.pull_request.labels.*.name, 'ok-to-test')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.4'
+      - name: Run e2e tests
+        run: make pr-ci-e2e-tests

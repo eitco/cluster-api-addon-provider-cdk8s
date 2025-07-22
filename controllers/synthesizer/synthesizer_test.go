@@ -1,6 +1,7 @@
 package synthesizer
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -256,9 +257,10 @@ resources: []`
 func TestImplementer_Synthesize(t *testing.T) {
 	logger := logr.Discard()
 	impl := &Implementer{}
+	ctx := context.Background()
 
 	t.Run("should return error if directory does not exist", func(t *testing.T) {
-		parsed, err := impl.Synthesize("/non/existent/dir", logger)
+		parsed, err := impl.Synthesize("/non/existent/dir", logger, ctx)
 		assert.Error(t, err)
 		assert.Nil(t, parsed)
 	})
@@ -270,7 +272,7 @@ func TestImplementer_Synthesize(t *testing.T) {
 		assert.NoError(t, err)
 
 		// No cdk8s binary, so synth should fail
-		parsed, err := impl.Synthesize(tempDir, logger)
+		parsed, err := impl.Synthesize(tempDir, logger, ctx)
 		assert.Error(t, err)
 		assert.Nil(t, parsed)
 	})
@@ -300,7 +302,7 @@ metadata:
 		os.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+origPath)
 		defer os.Setenv("PATH", origPath)
 
-		parsed, err := impl.Synthesize(tempDir, logger)
+		parsed, err := impl.Synthesize(tempDir, logger, ctx)
 		assert.NoError(t, err)
 		assert.Len(t, parsed, 1)
 		assert.Equal(t, "ConfigMap", parsed[0].GetKind())
@@ -345,7 +347,7 @@ metadata:
 		os.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+origPath)
 		defer os.Setenv("PATH", origPath)
 
-		parsed, err := impl.Synthesize(tempDir, logger)
+		parsed, err := impl.Synthesize(tempDir, logger, ctx)
 		assert.NoError(t, err)
 		assert.Len(t, parsed, 1)
 		assert.Equal(t, "ConfigMap", parsed[0].GetKind())
@@ -379,7 +381,7 @@ metadata:
 		manifestPath := filepath.Join(distDir, "test.yaml")
 		assert.NoError(t, os.WriteFile(manifestPath, []byte(manifestContent), 0644))
 
-		parsed, err := impl.Synthesize(tempDir, logger)
+		parsed, err := impl.Synthesize(tempDir, logger, ctx)
 		assert.NoError(t, err)
 		assert.Len(t, parsed, 1)
 		assert.Equal(t, "ts-cm", parsed[0].GetName())
