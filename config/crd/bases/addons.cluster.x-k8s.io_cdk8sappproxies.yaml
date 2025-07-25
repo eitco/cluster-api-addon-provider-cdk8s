@@ -27,6 +27,9 @@ spec:
       name: Message
       priority: 1
       type: string
+    - jsonPath: .status.observedGeneration
+      name: ObservedGen
+      type: integer
     name: v1alpha1
     schema:
       openAPIV3Schema:

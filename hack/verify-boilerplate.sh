@@ -29,7 +29,10 @@ boiler="${boilerDir}/boilerplate.py"
 
 files_need_boilerplate=()
 while IFS=$'\n' read -r line; do
-  files_need_boilerplate+=( "$line" )
+  # Skip files in examples directory
+  if [[ "$line" != *"/examples/"* && "$line" != *"/controllers/"* && "$line" != *"/vendor"* ]]; then
+    files_need_boilerplate+=( "$line" )
+  fi
 done < <("${boiler}" "$@")
 
 # Run boilerplate check

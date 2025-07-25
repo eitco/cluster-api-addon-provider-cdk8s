@@ -20,5 +20,5 @@ set -o pipefail
 
 REPO_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-# Build CAAPH controller manager
+# Build CAAPC controller manager
 cd "${REPO_ROOT}" && make manager

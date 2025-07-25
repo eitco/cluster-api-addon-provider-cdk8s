@@ -63,4 +63,6 @@ const (
 	ResourceApplyFailedReason = "ResourceApplyFailed"
 	// GitAuthenticationFailedReason indicates that Git authentication failed (e.g., bad credentials).
 	GitAuthenticationFailedReason string = "GitAuthenticationFailed"
+
+	Cdk8sAppProxyReadyCondition clusterv1.ConditionType = "Cdk8sAppProxyReady"
 )

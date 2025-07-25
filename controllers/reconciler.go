@@ -84,7 +84,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 			return controller, err
 		}
 
-		parsedResources, err := synthImpl.Synthesize(directory, logger)
+		parsedResources, err := synthImpl.Synthesize(directory, logger, ctx)
 		if err != nil {
 			logger.Error(err, "failed to synthesize resources")
 			controller = ctrl.Result{RequeueAfter: pollInterval}
@@ -99,9 +99,16 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 			return controller, err
 		}
+
+		// ToDo: https://github.com/eitco/cluster-api-addon-provider-cdk8s/issues/13
+		// Set Condition to ready
+		// conditions.MarkTrue(cdk8sAppProxy, addonsv1alpha1.Cdk8sAppProxyReadyCondition)
+
+		// Set the revision in the Cdk8sAppProxy status
+		// cdk8sAppProxy.Status.Revision = 1
 	}
 
-	parsedResources, err := synthImpl.Synthesize(directory, logger)
+	parsedResources, err := synthImpl.Synthesize(directory, logger, ctx)
 	if err != nil {
 		logger.Error(err, "failed to synthesize resources")
 		controller = ctrl.Result{RequeueAfter: pollInterval}
@@ -120,7 +127,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	// ToDo: Maybe we need to loop for each resource
 	if missingResources {
 		logger.Info("Missing resources detected, proceeding with reconciliation.")
-		parsedResources, err = synthImpl.Synthesize(directory, logger)
+		parsedResources, err = synthImpl.Synthesize(directory, logger, ctx)
 		if err != nil {
 			logger.Error(err, "failed to synthesize resources")
 			controller = ctrl.Result{RequeueAfter: pollInterval}
@@ -135,6 +142,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 			return controller, err
 		}
+
+		// ToDo: https://github.com/eitco/cluster-api-addon-provider-cdk8s/issues/13
+		// Set Condition to ready
+		// conditions.MarkTrue(cdk8sAppProxy, addonsv1alpha1.Cdk8sAppProxyReadyCondition)
+
+		// Set the revision in the Cdk8sAppProxy status
+		// cdk8sAppProxy.Status.Revision++
 
 		controller = ctrl.Result{RequeueAfter: pollInterval}
 
@@ -167,7 +181,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 			return controller, err
 		}
 
-		parsedResources, err = synthImpl.Synthesize(directory, logger)
+		parsedResources, err = synthImpl.Synthesize(directory, logger, ctx)
 		if err != nil {
 			logger.Error(err, "failed to synthesize resources")
 			controller = ctrl.Result{RequeueAfter: pollInterval}
@@ -182,6 +196,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 			return controller, err
 		}
+
+		// ToDo: https://github.com/eitco/cluster-api-addon-provider-cdk8s/issues/13
+		// Set Condition to ready
+		// conditions.MarkTrue(cdk8sAppProxy, addonsv1alpha1.Cdk8sAppProxyReadyCondition)
+
+		// Set the revision in the Cdk8sAppProxy status
+		// cdk8sAppProxy.Status.Revision++
 	}
 	controller = ctrl.Result{RequeueAfter: pollInterval}
 

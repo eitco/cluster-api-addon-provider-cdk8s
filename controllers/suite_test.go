@@ -19,8 +19,11 @@ package controllers_test
 import (
 	"context"
 	"flag"
+	"fmt"
+	"go.uber.org/mock/gomock"
 	"path/filepath"
 	"testing"
+	"time"
 
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	caapccontroller "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers"
@@ -48,10 +51,27 @@ var (
 	cancel     context.CancelFunc
 )
 
+const (
+	timeout  = time.Second * 10
+	interval = time.Millisecond * 250
+)
+
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
+}
+
+var _ gomock.TestReporter = (*TestReporter)(nil)
+
+type TestReporter struct{}
+
+func (c TestReporter) Errorf(format string, args ...any) {
+	panic(fmt.Sprintf(format, args...))
+}
+
+func (c TestReporter) Fatalf(format string, args ...any) {
+	panic(fmt.Sprintf(format, args...))
 }
 
 var _ = BeforeSuite(func() {
