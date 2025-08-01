@@ -204,7 +204,7 @@ GOLANGCI_LINT := $(abspath $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN))
 
 # If REGISTRY is not set, default to localhost:5000 to use the kind registry.
 ifndef REGISTRY
-	REGISTRY ?= localhost:5000
+	REGISTRY ?= ghcr.io/eitco/cluster-api-addon-provider-cdk8s
 endif
 
 PROD_REGISTRY ?= ghcr.io/eitco/cluster-api-addon-provider-cdk8s
@@ -219,7 +219,8 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
-TAG ?= dev
+# TAG ?= dev
+TAG ?= v1.0.0-alpha.8-7
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 

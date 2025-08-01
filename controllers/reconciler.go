@@ -8,7 +8,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	gitoperator "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/git"
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/resourcer"
