@@ -7,5 +7,5 @@ spec:
   template:
     spec:
       containers:
-      - image: localhost:5000/cluster-api-cdk8s-controller-arm64:dev
+      - image: ghcr.io/eitco/cluster-api-addon-provider-cdk8s/cluster-api-cdk8s-controller-s390x:v1.0.0-alpha.6
         name: manager
