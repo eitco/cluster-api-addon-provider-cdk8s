@@ -21,7 +21,7 @@ set -o pipefail
 HADOLINT_VER=${1:-latest}
 HADOLINT_FAILURE_THRESHOLD=${2:-warning}
 
-FILES=$(find -- * -name Dockerfile)
+FILES=$(find . -not -path "./examples/*" -name Dockerfile)
 while read -r file; do
   echo "Linting: ${file}"
   # Configure the linter to fail for warnings and errors. Can be set to: error | warning | info | style | ignore | none

@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 )
 
 type ApplicationType string
@@ -33,18 +35,20 @@ type KustomizationFile struct {
 }
 
 type Synthesizer interface {
-	Synthesize(directory string, logger logr.Logger, ctx context.Context) (parsedManifests []*unstructured.Unstructured, err error)
+	Synthesize(directory string, cdk8sAppProxy *addonsv1alpha1.Cdk8sAppProxy, logger logr.Logger, ctx context.Context) (parsedManifests []*unstructured.Unstructured, err error)
 }
 
 // Implementer implements the Synthesizer method.
 type Implementer struct{}
 
-func (i *Implementer) Synthesize(directory string, logger logr.Logger, ctx context.Context) (parsedManifests []*unstructured.Unstructured, err error) {
+func (i *Implementer) Synthesize(directory string, cdk8sAppProxy *addonsv1alpha1.Cdk8sAppProxy, logger logr.Logger, ctx context.Context) (parsedManifests []*unstructured.Unstructured, err error) {
+	apiPath := filepath.Join(directory, cdk8sAppProxy.Spec.GitRepository.Path)
+
 	kind := cdk8sType(directory, logger)
 
 	if kind == string(cdk8sTypescript) {
 		npmInstall := exec.CommandContext(ctx, "npm", "install")
-		npmInstall.Dir = directory
+		npmInstall.Dir = apiPath
 		output, err := npmInstall.CombinedOutput()
 		if err != nil {
 			logger.Error(err, "npm installation failed", "msg:", string(output))
@@ -52,14 +56,14 @@ func (i *Implementer) Synthesize(directory string, logger logr.Logger, ctx conte
 	}
 
 	synth := exec.CommandContext(ctx, "cdk8s", "synth")
-	synth.Dir = directory
+	synth.Dir = apiPath
 	if err := synth.Run(); err != nil {
 		logger.Error(err, "Failed to synth cdk8s application")
 
 		return parsedManifests, err
 	}
 
-	foundManifests, err := findManifests(directory, logger)
+	foundManifests, err := findManifests(apiPath, logger)
 	if err != nil {
 		logger.Error(err, "Failed to find manifests in directory")
 

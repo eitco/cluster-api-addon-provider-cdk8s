@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"os"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	gitoperator "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/git"
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/resourcer"
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/synthesizer"
-	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,7 +84,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 			return controller, err
 		}
 
-		parsedResources, err := synthImpl.Synthesize(directory, logger, ctx)
+		parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
 		if err != nil {
 			logger.Error(err, "failed to synthesize resources")
 			controller = ctrl.Result{RequeueAfter: pollInterval}
@@ -108,7 +108,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		// cdk8sAppProxy.Status.Revision = 1
 	}
 
-	parsedResources, err := synthImpl.Synthesize(directory, logger, ctx)
+	parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
 	if err != nil {
 		logger.Error(err, "failed to synthesize resources")
 		controller = ctrl.Result{RequeueAfter: pollInterval}
@@ -127,7 +127,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	// ToDo: Maybe we need to loop for each resource
 	if missingResources {
 		logger.Info("Missing resources detected, proceeding with reconciliation.")
-		parsedResources, err = synthImpl.Synthesize(directory, logger, ctx)
+		parsedResources, err = synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
 		if err != nil {
 			logger.Error(err, "failed to synthesize resources")
 			controller = ctrl.Result{RequeueAfter: pollInterval}
@@ -181,7 +181,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 			return controller, err
 		}
 
-		parsedResources, err = synthImpl.Synthesize(directory, logger, ctx)
+		parsedResources, err = synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
 		if err != nil {
 			logger.Error(err, "failed to synthesize resources")
 			controller = ctrl.Result{RequeueAfter: pollInterval}
