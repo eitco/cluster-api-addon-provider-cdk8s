@@ -77,7 +77,7 @@ ARG ARCH
 # Set shell with pipefail option for better error handling
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
-RUN apk add --no-cache ca-certificates curl nodejs npm \
+RUN apk add --no-cache ca-certificates=20231108 curl=8.1.2-r0 nodejs=18.16.0-r0 npm=9.5.1-r0 \
     && npm install -g cdk8s-cli@2.200.109 \
     && curl -fsSL -o go1.24.4.linux-${ARCH}.tar.gz https://go.dev/dl/go1.24.4.linux-${ARCH}.tar.gz \
     && tar -C /usr/local -xzf go1.24.4.linux-${ARCH}.tar.gz \
