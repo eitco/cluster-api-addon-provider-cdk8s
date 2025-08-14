@@ -2,11 +2,11 @@ package synthesizer
 
 import (
 	"context"
-	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	"os"
 	"path/filepath"
 	"testing"
 
+	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 )
