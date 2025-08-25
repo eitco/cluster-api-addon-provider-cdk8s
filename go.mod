@@ -10,7 +10,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.7
 	github.com/stretchr/testify v1.11.0
-	go.uber.org/mock v0.5.2
+	go.uber.org/mock v0.6.0
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
 	k8s.io/client-go v0.31.3
