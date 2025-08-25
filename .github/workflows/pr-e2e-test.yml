@@ -16,6 +16,6 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.4'
+          go-version: '1.25'
       - name: Run e2e tests
         run: make pr-ci-e2e-tests
