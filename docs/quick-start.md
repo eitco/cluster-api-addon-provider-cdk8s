@@ -54,6 +54,15 @@ clusterctl get kubeconfig capi-quickstart > capi-quickstart.kubeconfig
 sed -i -e "s/server:.*/server: https:\/\/$(docker port capi-quickstart-lb 6443/tcp | sed "s/0.0.0.0/127.0.0.1/")/g" ./capi-quickstart.kubeconfig
 ```
 
+## Apply CNI calico
+
+```
+kubectl --kubeconfig=./capi-quickstart.kubeconfig \
+  apply -f calico.yaml
+```
+
+for Downloadpath see CAPI Quickstart Guide
+
 ## Apply cdk8sAppProxy resource to management-Cluster
 
 ```
