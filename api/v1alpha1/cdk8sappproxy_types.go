@@ -24,6 +24,8 @@ import (
 // GitRepositorySpec defines the desired state of a Git repository source.
 type GitRepositorySpec struct {
 	// URL is the git repository URL.
+	// If the provided Repository is private the URL
+	// needs to be provided in the form of 'git@github.com:...'
 	// +kubebuilder:validation:Required
 	URL string `json:"url"`
 
@@ -40,6 +42,12 @@ type GitRepositorySpec struct {
 	// Defaults to the root of the repository.
 	// +kubebuilder:validation:Required
 	Path string `json:"path"`
+
+	// SecretRef references to a secret with the 
+	// needed token, used to pull from a private repository.
+	// Currently, we do not support BasicAuth.
+	// +kubebuilder:validation:optional
+	SecretRef string `json:"secretRef,omitempty"`
 }
 
 // Cdk8sAppProxySpec defines the desired state of Cdk8sAppProxy.
