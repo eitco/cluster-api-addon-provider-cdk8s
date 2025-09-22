@@ -24,7 +24,7 @@ SHELL:=/usr/bin/env bash
 # Go.
 #
 GO_VERSION ?= $(shell cat go.mod | grep "toolchain" | { read _ v; echo "$${v#go}"; } | grep "[0-9]" || cat go.mod | grep "go " | head -1 | awk '{print $$2}')
-GO_CONTAINER_IMAGE ?= golang:1.24.4
+GO_CONTAINER_IMAGE ?= golang:1.25.0
 
 # Use GOPROXY environment variable if set
 GOPROXY := $(shell go env GOPROXY)
