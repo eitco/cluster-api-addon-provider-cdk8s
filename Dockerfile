@@ -79,9 +79,9 @@ SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
 RUN apk add --no-cache ca-certificates=20250619-r0 curl=8.12.1-r0 nodejs=20.15.1-r0 npm=10.9.1-r0 \
     && npm install -g cdk8s-cli@2.200.152 \
-    && curl -fsSL -o go1.24.4.linux-${ARCH}.tar.gz https://go.dev/dl/go1.24.4.linux-${ARCH}.tar.gz \
-    && tar -C /usr/local -xzf go1.24.4.linux-${ARCH}.tar.gz \
-    && rm go1.24.4.linux-${ARCH}.tar.gz \
+    && curl -fsSL -o go1.25.0.linux-${ARCH}.tar.gz https://go.dev/dl/go1.25.0.linux-${ARCH}.tar.gz \
+    && tar -C /usr/local -xzf go1.25.0.linux-${ARCH}.tar.gz \
+    && rm go1.25.0.linux-${ARCH}.tar.gz \
     && rm -rf /tmp/*
 
 # Set Go environment variables
