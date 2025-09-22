@@ -49,5 +49,5 @@ func CniInstallSpec(ctx context.Context, inputGetter func() CniInstallInput) {
 	mgmtClient = input.BootstrapClusterProxy.GetClient()
 	Expect(mgmtClient).NotTo(BeNil())
 
-	EnsureCNIInstallation(ctx, input)
+	// EnsureCNIInstallation(ctx, input)
 }

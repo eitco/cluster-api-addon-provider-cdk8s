@@ -133,7 +133,7 @@ var _ = Describe("Workload cluster creation", func() {
 						URL:                   "https://github.com/PatrickLaabs/cdk8s-sample-deployment",
 						Reference:             "main",
 						Path:                  ".",
-						ReferencePollInterval: &metav1.Duration{Duration: 30 * time.Second},
+						// ReferencePollInterval: &metav1.Duration{Duration: 30 * time.Second},
 					},
 					ClusterSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{},

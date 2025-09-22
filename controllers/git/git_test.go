@@ -5,14 +5,6 @@ import (
 	"testing"
 )
 
-/*
-var (
-	validRepoUrl   = "https://github.com/PatrickLaabs/cdk8s-sample-deployment"
-	invalidRepoUrl = "https://github.com/PatrickLaabs/invalid-repo"
-	branch         = "main"
-)
-*/
-
 func TestIsUrl(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -113,19 +105,19 @@ func TestIsUrl(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isUrl(tt.input)
+			result := isURL(tt.input)
 			if result != tt.expected {
-				t.Errorf("isUrl(%q) = %v, expected %v", tt.input, result, tt.expected)
+				t.Errorf("isURL(%q) = %v, expected %v", tt.input, result, tt.expected)
 			}
 
 			// Additional test: verify the actual scheme parsing
 			if tt.expected || tt.expectedScheme == "" {
-				parsedUrl, err := url.ParseRequestURI(tt.input)
+				parsedURL, err := url.ParseRequestURI(tt.input)
 				if err != nil && tt.expected {
 					t.Errorf("Expected %q to parse successfully, but got error: %v", tt.input, err)
 				} else if err == nil {
-					if parsedUrl.Scheme != tt.expectedScheme {
-						t.Errorf("For input %q, expected scheme %q, but got %q", tt.input, tt.expectedScheme, parsedUrl.Scheme)
+					if parsedURL.Scheme != tt.expectedScheme {
+						t.Errorf("For input %q, expected scheme %q, but got %q", tt.input, tt.expectedScheme, parsedURL.Scheme)
 					}
 				}
 			}
@@ -203,6 +195,9 @@ func TestEmptyChecker(t *testing.T) {
 		})
 	}
 }
+
+// Tests for the authentication implemention for a privat git repository
+
 
 // Helper functions.
 /*
