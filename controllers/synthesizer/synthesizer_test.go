@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 )
@@ -254,13 +255,23 @@ resources: []`
 		assert.Error(t, err)
 	})
 }
+
 func TestImplementer_Synthesize(t *testing.T) {
 	logger := logr.Discard()
 	impl := &Implementer{}
 	ctx := context.Background()
 
 	t.Run("should return error if directory does not exist", func(t *testing.T) {
-		parsed, err := impl.Synthesize("/non/existent/dir", logger, ctx)
+		cdk8sAppProxy := &addonsv1alpha1.Cdk8sAppProxy{
+			Spec: addonsv1alpha1.Cdk8sAppProxySpec{
+				GitRepository: &addonsv1alpha1.GitRepositorySpec{
+					Path:      "deployments",
+					URL:       "https://github.com/test/repo",
+					Reference: "main",
+				},
+			},
+		}
+		parsed, err := impl.Synthesize("/non/existent/dir", cdk8sAppProxy, logger, ctx)
 		assert.Error(t, err)
 		assert.Nil(t, parsed)
 	})
@@ -271,27 +282,42 @@ func TestImplementer_Synthesize(t *testing.T) {
 		_, err := os.Create(filepath.Join(tempDir, "main.go"))
 		assert.NoError(t, err)
 
+		cdk8sAppProxy := &addonsv1alpha1.Cdk8sAppProxy{
+			Spec: addonsv1alpha1.Cdk8sAppProxySpec{
+				GitRepository: &addonsv1alpha1.GitRepositorySpec{
+					Path:      "deployments",
+					URL:       "https://github.com/test/repo",
+					Reference: "main",
+				},
+			},
+		}
+
 		// No cdk8s binary, so synth should fail
-		parsed, err := impl.Synthesize(tempDir, logger, ctx)
+		parsed, err := impl.Synthesize(tempDir, cdk8sAppProxy, logger, ctx)
 		assert.Error(t, err)
 		assert.Nil(t, parsed)
 	})
 
 	t.Run("should parse manifests if present after synth", func(t *testing.T) {
 		tempDir := t.TempDir()
-		distDir := filepath.Join(tempDir, "dist")
+		// Create the deployments directory
+		deploymentsDir := filepath.Join(tempDir, "deployments")
+		err := os.MkdirAll(deploymentsDir, 0755)
+		assert.NoError(t, err)
+
+		distDir := filepath.Join(deploymentsDir, "dist")
 		assert.NoError(t, os.Mkdir(distDir, 0755))
 		manifestContent := `
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: test-cm
+ name: test-cm
 `
 		manifestPath := filepath.Join(distDir, "test.yaml")
 		assert.NoError(t, os.WriteFile(manifestPath, []byte(manifestContent), 0644))
 
 		// Create a Go file so cdk8sType returns "go"
-		_, err := os.Create(filepath.Join(tempDir, "main.go"))
+		_, err = os.Create(filepath.Join(tempDir, "main.go"))
 		assert.NoError(t, err)
 
 		// Create a fake cdk8s binary in PATH that just exits 0
@@ -302,7 +328,17 @@ metadata:
 		os.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+origPath)
 		defer os.Setenv("PATH", origPath)
 
-		parsed, err := impl.Synthesize(tempDir, logger, ctx)
+		cdk8sAppProxy := &addonsv1alpha1.Cdk8sAppProxy{
+			Spec: addonsv1alpha1.Cdk8sAppProxySpec{
+				GitRepository: &addonsv1alpha1.GitRepositorySpec{
+					Path:      "deployments",
+					URL:       "https://github.com/test/repo",
+					Reference: "main",
+				},
+			},
+		}
+
+		parsed, err := impl.Synthesize(tempDir, cdk8sAppProxy, logger, ctx)
 		assert.NoError(t, err)
 		assert.Len(t, parsed, 1)
 		assert.Equal(t, "ConfigMap", parsed[0].GetKind())
@@ -311,16 +347,22 @@ metadata:
 
 	t.Run("should parse kustomization manifests if kustomization file present", func(t *testing.T) {
 		tempDir := t.TempDir()
-		distDir := filepath.Join(tempDir, "dist")
+
+		// Create the deployments directory
+		deploymentsDir := filepath.Join(tempDir, "deployments")
+		err := os.MkdirAll(deploymentsDir, 0755)
+		assert.NoError(t, err)
+
+		distDir := filepath.Join(deploymentsDir, "dist")
 		assert.NoError(t, os.Mkdir(distDir, 0755))
 
 		// Write kustomization.yaml
 		kustomContent := `apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 metadata:
-  name: kustomization
+ name: kustomization
 resources:
-  - cm.yaml
+ - cm.yaml
 `
 		kustomPath := filepath.Join(distDir, "kustomization.yaml")
 		assert.NoError(t, os.WriteFile(kustomPath, []byte(kustomContent), 0644))
@@ -330,13 +372,13 @@ resources:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kustom-cm
+ name: kustom-cm
 `
 		cmPath := filepath.Join(distDir, "cm.yaml")
 		assert.NoError(t, os.WriteFile(cmPath, []byte(cmContent), 0644))
 
 		// Create a Go file so cdk8sType returns "go"
-		_, err := os.Create(filepath.Join(tempDir, "main.go"))
+		_, err = os.Create(filepath.Join(tempDir, "main.go"))
 		assert.NoError(t, err)
 
 		// Fake cdk8s binary
@@ -347,7 +389,17 @@ metadata:
 		os.Setenv("PATH", fakeBinDir+string(os.PathListSeparator)+origPath)
 		defer os.Setenv("PATH", origPath)
 
-		parsed, err := impl.Synthesize(tempDir, logger, ctx)
+		cdk8sAppProxy := &addonsv1alpha1.Cdk8sAppProxy{
+			Spec: addonsv1alpha1.Cdk8sAppProxySpec{
+				GitRepository: &addonsv1alpha1.GitRepositorySpec{
+					Path:      "deployments",
+					URL:       "https://github.com/test/repo",
+					Reference: "main",
+				},
+			},
+		}
+
+		parsed, err := impl.Synthesize(tempDir, cdk8sAppProxy, logger, ctx)
 		assert.NoError(t, err)
 		assert.Len(t, parsed, 1)
 		assert.Equal(t, "ConfigMap", parsed[0].GetKind())
@@ -356,7 +408,13 @@ metadata:
 
 	t.Run("should run npm install for typescript projects", func(t *testing.T) {
 		tempDir := t.TempDir()
-		_, err := os.Create(filepath.Join(tempDir, "main.ts"))
+
+		// Create the deployments directory
+		deploymentsDir := filepath.Join(tempDir, "deployments")
+		err := os.MkdirAll(deploymentsDir, 0755)
+		assert.NoError(t, err)
+
+		_, err = os.Create(filepath.Join(tempDir, "main.ts"))
 		assert.NoError(t, err)
 
 		// Fake npm and cdk8s binaries
@@ -370,18 +428,28 @@ metadata:
 		defer os.Setenv("PATH", origPath)
 
 		// Create dist dir and manifest
-		distDir := filepath.Join(tempDir, "dist")
+		distDir := filepath.Join(deploymentsDir, "dist")
 		assert.NoError(t, os.Mkdir(distDir, 0755))
 		manifestContent := `
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: ts-cm
+ name: ts-cm
 `
 		manifestPath := filepath.Join(distDir, "test.yaml")
 		assert.NoError(t, os.WriteFile(manifestPath, []byte(manifestContent), 0644))
 
-		parsed, err := impl.Synthesize(tempDir, logger, ctx)
+		cdk8sAppProxy := &addonsv1alpha1.Cdk8sAppProxy{
+			Spec: addonsv1alpha1.Cdk8sAppProxySpec{
+				GitRepository: &addonsv1alpha1.GitRepositorySpec{
+					Path:      "deployments",
+					URL:       "https://github.com/test/repo",
+					Reference: "main",
+				},
+			},
+		}
+
+		parsed, err := impl.Synthesize(tempDir, cdk8sAppProxy, logger, ctx)
 		assert.NoError(t, err)
 		assert.Len(t, parsed, 1)
 		assert.Equal(t, "ts-cm", parsed[0].GetName())
