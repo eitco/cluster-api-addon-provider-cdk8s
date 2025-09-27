@@ -81,13 +81,13 @@ var _ = Describe("Running the Cluster API E2E tests", func() {
 	//				ControlPlaneWaiters: clusterctl.ControlPlaneWaiters{
 	//					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
 	//				},
-	//				InitWithKubernetesVersion:       e2eConfig.GetVariable(KubernetesVersionAPIUpgradeFrom),
-	//				InitWithBinary:                  fmt.Sprintf("https://github.com/kubernetes-sigs/cluster-api/releases/download/%s/clusterctl-{OS}-{ARCH}", e2eConfig.GetVariable(OldCAPIUpgradeVersion)),
-	//				InitWithCoreProvider:            "cluster-api:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion),
-	//				InitWithBootstrapProviders:      []string{"kubeadm:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
-	//				InitWithControlPlaneProviders:   []string{"kubeadm:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
-	//				InitWithInfrastructureProviders: []string{"docker:" + e2eConfig.GetVariable(OldCAPIUpgradeVersion)},
-	//				InitWithAddonProviders:          []string{"eitco-cdk8s:" + e2eConfig.GetVariable(OldProviderUpgradeVersion)},
+	//				InitWithKubernetesVersion:       e2eConfig.MustGetVariable(KubernetesVersionAPIUpgradeFrom),
+	//				InitWithBinary:                  fmt.Sprintf("https://github.com/kubernetes-sigs/cluster-api/releases/download/%s/clusterctl-{OS}-{ARCH}", e2eConfig.MustGetVariable(OldCAPIUpgradeVersion)),
+	//				InitWithCoreProvider:            "cluster-api:" + e2eConfig.MustGetVariable(OldCAPIUpgradeVersion),
+	//				InitWithBootstrapProviders:      []string{"kubeadm:" + e2eConfig.MustGetVariable(OldCAPIUpgradeVersion)},
+	//				InitWithControlPlaneProviders:   []string{"kubeadm:" + e2eConfig.MustGetVariable(OldCAPIUpgradeVersion)},
+	//				InitWithInfrastructureProviders: []string{"docker:" + e2eConfig.MustGetVariable(OldCAPIUpgradeVersion)},
+	//				InitWithAddonProviders:          []string{"eitco-cdk8s:" + e2eConfig.MustGetVariable(OldProviderUpgradeVersion)},
 	//			}
 	//		})
 	//	})
