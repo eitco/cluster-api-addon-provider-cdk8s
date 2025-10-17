@@ -41,3 +41,5 @@ tmp/
 
 # Release Files
 out/
+
+cdk8sappproxy.yaml

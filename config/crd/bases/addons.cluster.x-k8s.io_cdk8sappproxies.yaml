@@ -119,8 +119,17 @@ spec:
                       ReferencePollInterval polls the defined git repository for changes.
                       Defaults to 5 min.
                     type: string
+                  secretRef:
+                    description: |-
+                      SecretRef references to a secret with the
+                      needed token, used to pull from a private repository.
+                      Currently, we do not support BasicAuth.
+                    type: string
                   url:
-                    description: URL is the git repository URL.
+                    description: |-
+                      URL is the git repository URL.
+                      If the provided Repository is private the URL
+                      needs to be provided in the form of 'git@github.com:...'
                     type: string
                 required:
                 - path

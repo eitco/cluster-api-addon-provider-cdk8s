@@ -1,3 +1,8 @@
+/*
+Package git holds every implemention needed
+to do various git operations.
+This is a interface-first implemention.
+*/
 package git
 
 import (
@@ -7,12 +12,15 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/go-logr/logr"
+ 	 gossh "golang.org/x/crypto/ssh"
 )
 
 // GitOperator defines the interface for git operations.
 type GitOperator interface {
-	Clone(repoUrl string, dir string, logger logr.Logger) (err error)
+	Clone(repoURL string, secretRef []byte, directory string, logger logr.Logger) (err error)
 	Poll(repo string, branch string, directory string, logger logr.Logger) (changes bool, err error)
 	Hash(repo string, branch string, logger logr.Logger) (hash string, err error)
 }
@@ -21,7 +29,9 @@ type GitOperator interface {
 type GitImplementer struct{}
 
 // Clone clones the given repository to a local directory.
-func (g *GitImplementer) Clone(repoUrl string, directory string, logger logr.Logger) (err error) {
+func (g *GitImplementer) Clone(repoURL string, secretRef []byte, directory string, logger logr.Logger) (err error) {
+	var auth transport.AuthMethod
+
 	err = os.Mkdir(directory, 0755)
 	if err != nil {
 		logger.Error(err, "Failed to create directory", "directory", directory)
@@ -30,17 +40,33 @@ func (g *GitImplementer) Clone(repoUrl string, directory string, logger logr.Log
 	}
 
 	// Check if repo and directory are empty.
-	if empty(repoUrl, directory) {
-		logger.Error(err, "repo and or directory is empty", "repoUrl", repoUrl, "directory", directory)
+	if empty(repoURL, directory) {
+		logger.Error(err, "repo and or directory is empty", "repoURL", repoURL, "directory", directory)
 
 		return err
 	}
 
+	auth, err = ssh.NewPublicKeys("git", secretRef, "")
+	if err != nil {
+		logger.Error(err, "Failed on retrieve the token from the tokenContent")
+
+		return err
+	}
+
+	pkAuth, ok := auth.(*ssh.PublicKeys)
+	if !ok {
+		logger.Error(err, "pkAuth error")
+	}
+
+	pkAuth.HostKeyCallback = gossh.InsecureIgnoreHostKey() 
+	
 	_, err = git.PlainClone(directory, false, &git.CloneOptions{
-		URL: repoUrl,
+		URL: repoURL,
+		Progress: os.Stdout, // Mainly used for debugging purposes
+		Auth: auth, 
 	})
 	if err != nil {
-		logger.Error(err, "Failed to clone repo", "repo", repoUrl)
+		logger.Error(err, "Failed to clone repo", "repo", repoURL)
 
 		return err
 	}

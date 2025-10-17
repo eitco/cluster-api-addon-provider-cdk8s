@@ -11,8 +11,10 @@ import (
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/resourcer"
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/synthesizer"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,9 +65,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		pollInterval = cdk8sAppProxy.Spec.GitRepository.ReferencePollInterval.Duration
 	}
 
-	repoUrl := cdk8sAppProxy.Spec.GitRepository.URL
+	repoURL := cdk8sAppProxy.Spec.GitRepository.URL
 	branch := cdk8sAppProxy.Spec.GitRepository.Reference
 	directory := fmt.Sprintf("/tmp/cdk8s-%s-%s-%s", cdk8sAppProxy.Namespace, cdk8sAppProxy.Name, branch)
+	secret := &corev1.Secret{}
 
 	if cdk8sAppProxy.Spec.GitRepository.URL == "" {
 		logger.Info("GitRepository URL is not specified in Cdk8sAppProxy spec", "cdk8sAppProxy", cdk8sAppProxy.Name)
@@ -74,10 +77,28 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		return controller, errors.New("GitRepository URL is not specified in Cdk8sAppProxy spec")
 	}
 
+	secretKey := types.NamespacedName{
+		Namespace: cdk8sAppProxy.Namespace,
+		Name:	cdk8sAppProxy.Spec.GitRepository.SecretRef,
+	}
+
+	if err = r.Get(ctx, secretKey, secret); err != nil {
+		logger.Error(err, "Error getting the Secret Token")
+
+		return controller, err
+	}
+
+	secretRef, ok := secret.Data["api-token"]
+	if !ok {
+		logger.Error(err, "Secret Key within SecretRef is not accessible")
+
+		return controller, err
+	}
+
 	if _, err := os.Stat(directory); os.IsNotExist(err) {
-		err = gitImpl.Clone(repoUrl, directory, logger)
+		err = gitImpl.Clone(repoURL, secretRef, directory, logger)
 		if err != nil {
-			logger.Error(err, "Failed to clone git repository", "repoUrl", repoUrl, "directory", directory)
+			logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
 			controller = ctrl.Result{RequeueAfter: pollInterval}
 
 			return controller, err
@@ -154,9 +175,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		return controller, err
 	}
 
-	hashChanges, err := gitImpl.Poll(repoUrl, branch, directory, logger)
+	hashChanges, err := gitImpl.Poll(repoURL, branch, directory, logger)
 	if err != nil {
-		logger.Error(err, "Failed to poll git repository", "repoUrl", repoUrl, "branch", branch)
+		logger.Error(err, "Failed to poll git repository", "repoURL", repoURL, "branch", branch)
 		controller = ctrl.Result{RequeueAfter: pollInterval}
 
 		return controller, err
@@ -172,9 +193,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 			return controller, err
 		}
 
-		err = gitImpl.Clone(cdk8sAppProxy.Spec.GitRepository.URL, directory, logger)
+		err = gitImpl.Clone(repoURL, secretRef, directory, logger)
 		if err != nil {
-			logger.Error(err, "failed to clone git repository")
+			logger.Error(err, "Failed to clone git repository")
 			controller = ctrl.Result{RequeueAfter: pollInterval}
 
 			return controller, err
