@@ -55,39 +55,41 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		return ctrl.Result{}, err
 	}
 
-	// if cdk8sAppProxy.Spec.GitRepository.ReferencePollInterval == nil {
-	// 	pollInterval = 5 * time.Minute
-	// } else {
-	// 	pollInterval = cdk8sAppProxy.Spec.GitRepository.ReferencePollInterval.Duration
-	// }
-
 	repoURL := cdk8sAppProxy.Spec.GitRepository.URL
 	branch := cdk8sAppProxy.Spec.GitRepository.Reference
 	directory := fmt.Sprintf("/tmp/cdk8s-%s-%s-%s", cdk8sAppProxy.Namespace, cdk8sAppProxy.Name, branch)
-	secret := &corev1.Secret{}
+	secretKey := cdk8sAppProxy.Spec.GitRepository.SecretKey
+	secretName := cdk8sAppProxy.Spec.GitRepository.SecretRef
+  var secretRef []byte
+	var ok bool
 
 	if cdk8sAppProxy.Spec.GitRepository.URL == "" {
 		logger.Error(err, "GitRepository URL not specified")
-		// controller = ctrl.Result{RequeueAfter: pollInterval}
+
 		return ctrl.Result{}, err
 	}
 
-	secretKey := types.NamespacedName{
-		Namespace: cdk8sAppProxy.Namespace,
-		Name:      cdk8sAppProxy.Spec.GitRepository.SecretRef,
-	}
+	if secretName != "" {
+		logger.Info("SecretRef provided, fetching secret from cluster", "secretName", secretName)
 
-	if err = r.Get(ctx, secretKey, secret); err != nil {
-		logger.Error(err, "Error getting the Secret Token")
-		// controller = ctrl.Result{RequeueAfter: pollInterval}
-		return ctrl.Result{}, err
-	}
+		namespacedSecretKey := types.NamespacedName{
+			Namespace: cdk8sAppProxy.Namespace,
+			Name: secretName,
+		}
 
-	secretRef, ok := secret.Data["api-token"]
-	if !ok {
-		logger.Error(err, "Secret Key within SecretRef is not accessible")
-		// controller = ctrl.Result{RequeueAfter: pollInterval}
-		return ctrl.Result{}, err
+		secret := &corev1.Secret{}
+		if err = r.Get(ctx, namespacedSecretKey, secret); err != nil {
+			logger.Error(err, "Error getting the Secret specified in SecretRef")
+
+			return ctrl.Result{}, err
+		}
+		
+		secretRef, ok = secret.Data[secretKey]
+		if !ok {
+			logger.Error(err, "secret '%s' does not contain data key '%s'", secretName, secretKey)
+
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Check access before (interface)Cloning
@@ -106,29 +108,25 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 	logger.Info("Checking if directory already exists")
 	if _, err := os.Stat(directory); os.IsNotExist(err) {
-		/*
-			logger.Info("Cloning Repo")
-			err = gitImpl.Clone(repoURL, secretRef, directory, logger)
-			if err != nil {
-				logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
-				// controller = ctrl.Result{RequeueAfter: pollInterval}
-				return ctrl.Result{}, err
-				}
-		*/
-		logger.Info("Cloning Repo trying ")
 		// Proceed with cloning knowing wether to use authentication
 		// Controlflow first tries no authentication and then provides a secretRef
 		if !requiredAuth {
-			_ = gitImpl.Clone(repoURL, nil, directory, logger)
-		} else {
-			_ = gitImpl.Clone(repoURL, secretRef, directory, logger)
+			secretRef = nil
 		}
+		
+		logger.Info("Cloning Repo")
+		err = gitImpl.Clone(repoURL, secretRef, directory, logger)
+		if err != nil {
+			logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
 
+			return ctrl.Result{}, err
+		}
+		
 		logger.Info("Parsing resources and synthing")
 		parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
 		if err != nil {
 			logger.Error(err, "failed to synthesize resources")
-			// controller = ctrl.Result{RequeueAfter: pollInterval}
+			
 			return ctrl.Result{}, err
 		}
 
@@ -136,7 +134,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
 		if err != nil {
 			logger.Error(err, "failed to apply resources")
-			// controller = ctrl.Result{RequeueAfter: pollInterval}
+		
 			return ctrl.Result{}, err
 		}
 		logger.Info("Successfully applied resources")
@@ -149,40 +147,36 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		// cdk8sAppProxy.Status.Revision = 1
 	}
 
-	parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
-	if err != nil {
-		logger.Error(err, "failed to synthesize resources")
-		// controller = ctrl.Result{RequeueAfter: pollInterval}
+	// parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
+	// if err != nil {
+	// 	logger.Error(err, "failed to synthesize resources")
+	//
+	// 	return ctrl.Result{}, err
+	// }
+	//
+	// missingResources, err := resourcerImpl.Check(ctx, cdk8sAppProxy, parsedResources, logger)
+	// if err != nil {
+	// 	logger.Error(err, "failed to check resources")
+	//
+	// 	return ctrl.Result{}, err
+	// }
 
-		return ctrl.Result{}, err
-	}
-
-	missingResources, err := resourcerImpl.Check(ctx, cdk8sAppProxy, parsedResources, logger)
-	if err != nil {
-		logger.Error(err, "failed to check resources")
-		// controller = ctrl.Result{RequeueAfter: pollInterval}
-
-		return ctrl.Result{}, err
-	}
-
-	if missingResources {
-		logger.Info("Missing resources detected, proceeding with reconciliation.")
-		parsedResources, err = synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
-		if err != nil {
-			logger.Error(err, "failed to synthesize resources")
-			// controller = ctrl.Result{RequeueAfter: pollInterval}
-
-			return ctrl.Result{}, err
-		}
-
-		err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
-		if err != nil {
-			logger.Error(err, "failed to apply resources")
-			// controller = ctrl.Result{RequeueAfter: pollInterval}
-
-			return ctrl.Result{}, err
-		}
-
+	// if missingResources {
+	// 	logger.Info("Missing resources detected, proceeding with reconciliation.")
+	// 	parsedResources, err = synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
+	// 	if err != nil {
+	// 		logger.Error(err, "failed to synthesize resources")
+	//
+	// 		return ctrl.Result{}, err
+	// 	}
+	//
+	// 	err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
+	// 	if err != nil {
+	// 		logger.Error(err, "failed to apply resources")
+	//
+	// 		return ctrl.Result{}, err
+	// 	}
+	//
 		// ToDo: https://github.com/eitco/cluster-api-addon-provider-cdk8s/issues/13
 		// Set Condition to ready
 		// conditions.MarkTrue(cdk8sAppProxy, addonsv1alpha1.Cdk8sAppProxyReadyCondition)
@@ -190,61 +184,53 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		// Set the revision in the Cdk8sAppProxy status
 		// cdk8sAppProxy.Status.Revision++
 
-		// controller = ctrl.Result{RequeueAfter: pollInterval}
-
 		return ctrl.Result{}, err
 	}
 
-	hashChanges, err := gitImpl.Poll(repoURL, secretRef, branch, directory, logger)
-	if err != nil {
-		logger.Error(err, "Failed to poll git repository", "repoURL", repoURL, "branch", branch)
-		// controller = ctrl.Result{RequeueAfter: pollInterval}
-
-		return ctrl.Result{}, err
-	}
-
-	if hashChanges {
-		logger.Info("Detected changes in git repository, proceeding with reconciliation.")
-
-		if err := os.RemoveAll(directory); err != nil {
-			logger.Error(err, "Failed to clean up directory", "directory", directory)
-			// controller = ctrl.Result{RequeueAfter: pollInterval}
-
-			return ctrl.Result{}, err
-		}
-
-		err = gitImpl.Clone(repoURL, secretRef, directory, logger)
-		if err != nil {
-			logger.Error(err, "Failed to clone git repository")
-			// controller = ctrl.Result{RequeueAfter: pollInterval}
-
-			return ctrl.Result{}, err
-		}
-
-		parsedResources, err = synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
-		if err != nil {
-			logger.Error(err, "failed to synthesize resources")
-			// controller = ctrl.Result{RequeueAfter: pollInterval}
-
-			return ctrl.Result{}, err
-		}
-
-		err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
-		if err != nil {
-			// logger.Error(err, "failed to apply resources")
-			// controller = ctrl.Result{RequeueAfter: pollInterval}
-
-			return ctrl.Result{}, err
-		}
-
+	// hashChanges, err := gitImpl.Poll(repoURL, secretRef, branch, directory, logger)
+	// if err != nil {
+	// 	logger.Error(err, "Failed to poll git repository", "repoURL", repoURL, "branch", branch)
+	//
+	// 	return ctrl.Result{}, err
+	// }
+	//
+	// if hashChanges {
+	// 	logger.Info("Detected changes in git repository, proceeding with reconciliation.")
+	//
+	// 	if err := os.RemoveAll(directory); err != nil {
+	// 		logger.Error(err, "Failed to clean up directory", "directory", directory)
+	//
+	// 		return ctrl.Result{}, err
+	// 	}
+	//
+	// 	err = gitImpl.Clone(repoURL, secretRef, directory, logger)
+	// 	if err != nil {
+	// 		logger.Error(err, "Failed to clone git repository")
+	//
+	// 		return ctrl.Result{}, err
+	// 	}
+	//
+	// 	parsedResources, err = synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
+	// 	if err != nil {
+	// 		logger.Error(err, "failed to synthesize resources")
+	//
+	// 		return ctrl.Result{}, err
+	// 	}
+	//
+	// 	err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
+	// 	if err != nil {
+	// 		logger.Error(err, "failed to apply resources")
+	//
+	// 		return ctrl.Result{}, err
+	// 	}
+	//
 		// ToDo: https://github.com/eitco/cluster-api-addon-provider-cdk8s/issues/13
 		// Set Condition to ready
 		// conditions.MarkTrue(cdk8sAppProxy, addonsv1alpha1.Cdk8sAppProxyReadyCondition)
 
 		// Set the revision in the Cdk8sAppProxy status
 		// cdk8sAppProxy.Status.Revision++
-	}
-	// controller = ctrl.Result{RequeueAfter: pollInterval}
+	// }
 
-	return ctrl.Result{}, err
-}
+	// return ctrl.Result{}, err
+// }

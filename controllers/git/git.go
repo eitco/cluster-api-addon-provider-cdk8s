@@ -89,6 +89,8 @@ func getSSHAuth(secretRef []byte, logger logr.Logger) (auth transport.AuthMethod
 
 // Clone clones the given repoURLsitory to a local directory.
 func (g *GitImplementer) Clone(repoURL string, secretRef []byte, directory string, logger logr.Logger) (err error) {
+	var auth transport.AuthMethod
+
 	logger.Info("Creating directory")
 	err = os.Mkdir(directory, 0755)
 	if err != nil {
@@ -105,9 +107,13 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, directory strin
 		return err
 	}
 
-	auth, err := getSSHAuth(secretRef, logger)
-	if err != nil {
-		logger.Error(err, "Failed to run getSSHAuth")
+	if secretRef != nil {
+    auth, err = getSSHAuth(secretRef, logger)
+	  if err != nil {
+		  logger.Error(err, "Failed to run getSSHAuth")
+
+			return err
+	  }
 	}
 
 	logger.Info("Plain Cloning repoURL")

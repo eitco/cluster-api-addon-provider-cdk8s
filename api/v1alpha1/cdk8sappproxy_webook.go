@@ -49,12 +49,6 @@ func (c *Cdk8sAppProxy) Default() {
 		c.Spec.GitRepository.Reference = "main"
 	}
 
-	// if c.Spec.GitRepository != nil && c.Spec.GitRepository.ReferencePollInterval == nil {
-	// 	c.Spec.GitRepository.ReferencePollInterval = &metav1.Duration{
-	// 		Duration: 5 * time.Minute,
-	// 	}
-	// }
-
 	// Set the default path if not specified
 	if c.Spec.GitRepository != nil && c.Spec.GitRepository.Path == "" {
 		c.Spec.GitRepository.Path = "."

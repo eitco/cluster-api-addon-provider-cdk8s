@@ -43,6 +43,7 @@ spec:
     reference: "main"
     path: "."
     secretRef: github-token
+    secretKey: api-token
   clusterSelector: {}
 
 ```

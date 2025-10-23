@@ -33,11 +33,6 @@ type GitRepositorySpec struct {
 	// +kubebuilder:validation:Required
 	Reference string `json:"reference"`
 
-	// ReferencePollInterval polls the defined git repository for changes.
-	// Defaults to 5 min.
-	// +kubebuilder:validation:optional
-	// ReferencePollInterval *metav1.Duration `json:"referencePollInterval,omitempty"`
-
 	// Path is the path within the repository where the cdk8s application is located.
 	// Defaults to the root of the repository.
 	// +kubebuilder:validation:Required
@@ -45,9 +40,12 @@ type GitRepositorySpec struct {
 
 	// SecretRef references to a secret with the 
 	// needed token, used to pull from a private repository.
-	// The Key must be 'api-token' for the secret.
 	// +kubebuilder:validation:optional
 	SecretRef string `json:"secretRef,omitempty"`
+
+	// SecretKey is the key within the SecretRef secret.
+	// +kubebuilder:validation:optional
+	SecretKey string `json:"secretKey,omitempty"`
 }
 
 // Cdk8sAppProxySpec defines the desired state of Cdk8sAppProxy.

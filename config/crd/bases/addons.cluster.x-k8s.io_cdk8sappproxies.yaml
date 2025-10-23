@@ -114,11 +114,13 @@ spec:
                   reference:
                     description: Reference is the git reference (branch, tag, or commit).
                     type: string
+                  secretKey:
+                    description: SecretKey is the key within the SecretRef secret.
+                    type: string
                   secretRef:
                     description: |-
                       SecretRef references to a secret with the
                       needed token, used to pull from a private repository.
-                      The Key must be 'api-token' for the secret.
                     type: string
                   url:
                     description: |-
