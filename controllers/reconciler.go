@@ -45,7 +45,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 	if err := r.Get(ctx, req.NamespacedName, cdk8sAppProxy); err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Error(err, "cdk8sAppProxy resource not found") 
+			logger.Error(err, "cdk8sAppProxy resource not found")
 
 			return ctrl.Result{}, err
 		}
@@ -74,7 +74,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 	secretKey := types.NamespacedName{
 		Namespace: cdk8sAppProxy.Namespace,
-		Name:	cdk8sAppProxy.Spec.GitRepository.SecretRef,
+		Name:      cdk8sAppProxy.Spec.GitRepository.SecretRef,
 	}
 
 	if err = r.Get(ctx, secretKey, secret); err != nil {
@@ -90,14 +90,38 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		return ctrl.Result{}, err
 	}
 
+	// Check access before (interface)Cloning
+	_, requiredAuth, err := gitImpl.CheckAccess(repoURL, secretRef, logger)
+	if err != nil {
+		logger.Error(err, "Failed to check repository access")
+
+		return ctrl.Result{}, err
+	}
+
+	if requiredAuth && len(secretRef) == 0 {
+		logger.Error(err, "Repository requires authentication but no secretRef was provided.")
+
+		return ctrl.Result{}, err
+	}
+
 	logger.Info("Checking if directory already exists")
 	if _, err := os.Stat(directory); os.IsNotExist(err) {
-		logger.Info("Cloning Repo")
-		err = gitImpl.Clone(repoURL, secretRef, directory, logger)
-		if err != nil {
-			logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
-			// controller = ctrl.Result{RequeueAfter: pollInterval}
-		  return ctrl.Result{}, err
+		/*
+			logger.Info("Cloning Repo")
+			err = gitImpl.Clone(repoURL, secretRef, directory, logger)
+			if err != nil {
+				logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
+				// controller = ctrl.Result{RequeueAfter: pollInterval}
+				return ctrl.Result{}, err
+				}
+		*/
+		logger.Info("Cloning Repo trying ")
+		// Proceed with cloning knowing wether to use authentication
+		// Controlflow first tries no authentication and then provides a secretRef
+		if !requiredAuth {
+			_ = gitImpl.Clone(repoURL, nil, directory, logger)
+		} else {
+			_ = gitImpl.Clone(repoURL, secretRef, directory, logger)
 		}
 
 		logger.Info("Parsing resources and synthing")
@@ -105,7 +129,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		if err != nil {
 			logger.Error(err, "failed to synthesize resources")
 			// controller = ctrl.Result{RequeueAfter: pollInterval}
-	  	return ctrl.Result{}, err
+			return ctrl.Result{}, err
 		}
 
 		logger.Info("Applying Synthed Code")
@@ -113,7 +137,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		if err != nil {
 			logger.Error(err, "failed to apply resources")
 			// controller = ctrl.Result{RequeueAfter: pollInterval}
-		  return ctrl.Result{}, err
+			return ctrl.Result{}, err
 		}
 		logger.Info("Successfully applied resources")
 
@@ -222,5 +246,5 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	}
 	// controller = ctrl.Result{RequeueAfter: pollInterval}
 
-  return ctrl.Result{}, err
+	return ctrl.Result{}, err
 }

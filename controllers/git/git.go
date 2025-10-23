@@ -23,10 +23,54 @@ type GitOperator interface {
 	Clone(repoURL string, secretRef []byte, directory string, logger logr.Logger) (err error)
 	Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error)
 	Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error)
+	CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error)
 }
 
 // GitImplementer implements the GitOperator interface.
 type GitImplementer struct{}
+
+func (g *GitImplementer) CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error) {
+	remoteRepo := git.NewRemote(nil, &config.RemoteConfig{
+		URLs: []string{repoURL},
+	})
+
+	// publicRepository
+	_, err = remoteRepo.List(&git.ListOptions{
+		Auth: nil,
+	})
+
+	if err == nil {
+		logger.Info("Repository is publicly accessible")
+		accessible = true
+		requiresAuth = false
+
+		return accessible, requiresAuth, nil
+	}
+
+	auth, err := getSSHAuth(secretRef, logger)
+	if err != nil {
+		logger.Error(err, "Failed to run getSSHAuth")
+		accessible = false
+		requiresAuth = true
+
+		return accessible, requiresAuth, err
+	}
+
+	// privateRepository
+	_, err = remoteRepo.List(&git.ListOptions{
+		Auth: auth,
+	})
+
+	if err == nil {
+		logger.Error(err, "Repository is privatly accessible")
+		accessible = true
+		requiresAuth = true
+
+		return accessible, requiresAuth, nil
+	}
+
+	return accessible, requiresAuth, err
+}
 
 func getSSHAuth(secretRef []byte, logger logr.Logger) (auth transport.AuthMethod, err error) {
 	if len(secretRef) == 0 {
@@ -68,8 +112,8 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, directory strin
 
 	logger.Info("Plain Cloning repoURL")
 	_, err = git.PlainClone(directory, false, &git.CloneOptions{
-		URL: repoURL,
-		Auth: auth, 
+		URL:   repoURL,
+		Auth:  auth,
 		Depth: 1,
 	})
 	if err != nil {
@@ -119,32 +163,30 @@ func (g *GitImplementer) Poll(repoURL string, secretRef []byte, branch string, d
 func (g *GitImplementer) Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
 	if isURL(repoURL) {
 		return g.remoteHash(repoURL, secretRef, branch, logger)
-	} 
+	}
 
 	return g.localHash(repoURL, logger)
 }
 
-
 // localHash retrieves the HEAD commit hash from a local repository.
 func (g *GitImplementer) localHash(path string, logger logr.Logger) (hash string, err error) {
-  localRepo, err := git.PlainOpen(path)
-  if err != nil {
-    logger.Error(err, "failed to open local repo")
-    
-		return hash, err
-  }
+	localRepo, err := git.PlainOpen(path)
+	if err != nil {
+		logger.Error(err, "failed to open local repo")
 
-  headRef, err := localRepo.Head()
-  if err != nil {
-		logger.Error(err, "failed to get head of local repo")
-		
 		return hash, err
-  }
+	}
+
+	headRef, err := localRepo.Head()
+	if err != nil {
+		logger.Error(err, "failed to get head of local repo")
+
+		return hash, err
+	}
 	hash = headRef.Hash().String()
 
-  return hash, err
+	return hash, err
 }
-
 
 func (g *GitImplementer) remoteHash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
 	if branch == "" {
@@ -182,73 +224,6 @@ func (g *GitImplementer) remoteHash(repoURL string, secretRef []byte, branch str
 
 	return hash, err
 }
-// Hash retrieves the hash of the given repoURLsitory.
-// func (g *GitImplementer) Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
-// 	auth, err = ssh.NewPublicKeys("git", secretRef, "")
-// 	if err != nil {
-// 		logger.Error(err, "Failed to retrieve the token from the tokenContent")
-//
-// 		return hash, err
-// 	}
-//
-// 	pkAuth, ok := auth.(*ssh.PublicKeys)
-// 	if !ok {
-// 		logger.Error(err, "pkAuth error")
-// 	}
-//
-// 	pkAuth.HostKeyCallback = gossh.InsecureIgnoreHostKey()
-//
-// 	switch {
-// 	case isURL(repoURL):
-// 		remoterepoURL := git.NewRemote(nil, &config.RemoteConfig{
-// 			URLs: []string{repoURL},
-// 			Name: "origin",
-// 		})
-//
-// 		refs, err := remoterepoURL.List(&git.ListOptions{
-// 			Auth: auth,
-// 		})
-// 		if err != nil {
-// 			logger.Error(err, "Failed to list remote repoURL", "repoURL", repoURL)
-//
-// 			return hash, err
-// 		}
-//
-// 		refName := plumbing.NewBranchReferenceName(branch)
-// 		for _, ref := range refs {
-// 			if ref.Name() == refName {
-// 				return ref.Hash().String(), err
-// 			}
-// 		}
-//
-// 		return hash, err
-// 	case !isURL(repoURL):
-// 		localrepoURL, err := git.PlainOpen(repoURL)
-// 		if err != nil {
-// 			logger.Error(err, "Failed to open local repoURL", "repoURL", repoURL)
-//
-// 			return hash, err
-// 		}
-//
-// 		headRef, err := localrepoURL.Head()
-// 		if err != nil {
-// 			logger.Error(err, "failed to get head for local git repoURL", "repoURL", repoURL)
-//
-// 			return hash, err
-// 		}
-//
-// 		hash = headRef.Hash().String()
-// 		if hash == "" {
-// 			logger.Error(err, "failed to get hash for local git repoURL", "repoURL", repoURL)
-//
-// 			return hash, err
-// 		}
-//
-// 		return hash, err
-// 	}
-//
-// 	return hash, err
-// }
 
 // isURL checks if the given string is a valid URL.
 func isURL(repoURL string) bool {
@@ -263,11 +238,7 @@ func isURL(repoURL string) bool {
 	if strings.Contains(repoURL, "@") && strings.Contains(repoURL, ":") {
 		return true
 	}
-	// if parsedURL.Scheme != "" {
-	// 	return true
-	// } else {
-	// 	return false
-	// }
+
 	return false
 }
 
