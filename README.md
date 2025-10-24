@@ -22,19 +22,19 @@ spec:
   gitRepository:
     url: "https://github.com/eitco/cluster-api-addon-provider-cdk8s"
     reference: "main"
-    referencePollInterval: "5m"
     path: "examples/cdk8s-sample-deployment"
   clusterSelector: {} # Matches all clusters in the same namespace
     # matchLabels:
       # environment: development
 ```
 
+If you want to use a public or private repository for your deployments, you can find some guidance [here](./docs/Private-Repositories.md)
+
 ### Cdk8sAppProxySpec Fields
 
 - **gitRepository**: (Optional) Specifies the Git repository for the cdk8s application. `gitRepository` must be specified.
     - **url**: (Required) The Git repository URL.
     - **reference**: (Required) The Git reference (branch, tag, or commit) to check out.
-    - **referencePollInterval**: (Optional) The interval at which the controller checks for changes in the Git repository. Defaults to `5m`.
     - **path**: (Required) The path within the repository where the cdk8s application is located. Defaults to the root.
 - **clusterSelector**: (Required) A `metav1.LabelSelector` that specifies which workload clusters the cdk8s application should be deployed to. The controller will watch for clusters matching this selector in the same namespace as the `Cdk8sAppProxy` resource.
 
