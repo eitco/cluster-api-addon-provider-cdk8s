@@ -45,6 +45,12 @@ Examples of `Cdk8sAppProxy` usage can be found in the `/examples` directory in t
 -   [`examples/cdk8sappproxy_sample-go.yaml`](./examples/cdk8sappproxy_sample-go.yaml): This example demonstrates how to deploy a sample cdk8s application from a public Git repository to clusters matching a specific label selector. It shows the usage of the `gitRepository` field.
 -   [`examples/cdk8sappproxy_sample-typescript.yaml`](./examples/cdk8sappproxy_sample-typescript.yaml): This directory contains a sample cdk8s application written in Typescript, which also generates a kustomization file.
 
+### Supported Platforms:
+
+`amd64 arm64 ppc64le`
+
+`s390` and `arm` is currently not supported.
+
 ### Code of conduct
 
 Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct](code-of-conduct.md).

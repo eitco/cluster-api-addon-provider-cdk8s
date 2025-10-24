@@ -21,6 +21,17 @@ ARG deployment_base_image
 ARG deployment_base_image_tag
 ARG goprivate
 
+# Build step only to fetch the ssh_known_hosts
+FROM ${deployment_base_image}:${deployment_base_image_tag} AS sshbuilder
+WORKDIR /ssh
+
+RUN apk add --no-cache openssh openssh-client
+
+COPY ./hack/update-ssh-known-hosts.sh ./
+
+# Known Hosts
+RUN ./update-ssh-known-hosts.sh
+
 # Build architecture
 ARG ARCH
 
@@ -49,9 +60,6 @@ RUN --mount=type=secret,id=netrc,required=false,target=/root/.netrc \
 
 # Copy the sources
 COPY ./ ./
-
-# Known Hosts
-RUN ./hack/update-ssh-known-hosts.sh
 
 # Cache the go build into the Go’s compiler cache folder so we take benefits of compiler caching across docker build calls
 RUN --mount=type=secret,id=netrc,required=false,target=/root/.netrc \
@@ -93,7 +101,7 @@ ENV GOROOT=/usr/local/go
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
-COPY --from=builder /workspace/hack/ssh_known_hosts /etc/ssh/ssh_known_hosts
+COPY --from=sshbuilder /ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts
 
 # Create non-root user
 RUN adduser -u 65532 -D -h /home/nonroot -s /bin/sh nonroot
