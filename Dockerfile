@@ -50,6 +50,9 @@ RUN --mount=type=secret,id=netrc,required=false,target=/root/.netrc \
 # Copy the sources
 COPY ./ ./
 
+# Known Hosts
+RUN ./hack/update-ssh-known-hosts.sh
+
 # Cache the go build into the Go’s compiler cache folder so we take benefits of compiler caching across docker build calls
 RUN --mount=type=secret,id=netrc,required=false,target=/root/.netrc \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -77,8 +80,8 @@ ARG ARCH
 # Set shell with pipefail option for better error handling
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
-RUN apk add --no-cache ca-certificates=20250619-r0 curl=8.12.1-r0 nodejs=20.15.1-r0 npm=10.9.1-r0 \
-    && npm install -g cdk8s-cli@2.200.152 \
+RUN apk add --no-cache ca-certificates=20250911-r0 curl=8.14.1-r2 nodejs=22.16.0-r2 npm=11.3.0-r1 \
+    && npm install -g cdk8s-cli@2.202.3 \
     && curl -fsSL -o go1.25.0.linux-${ARCH}.tar.gz https://go.dev/dl/go1.25.0.linux-${ARCH}.tar.gz \
     && tar -C /usr/local -xzf go1.25.0.linux-${ARCH}.tar.gz \
     && rm go1.25.0.linux-${ARCH}.tar.gz \
@@ -90,6 +93,7 @@ ENV GOROOT=/usr/local/go
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/hack/ssh_known_hosts /etc/ssh/ssh_known_hosts
 
 # Create non-root user
 RUN adduser -u 65532 -D -h /home/nonroot -s /bin/sh nonroot

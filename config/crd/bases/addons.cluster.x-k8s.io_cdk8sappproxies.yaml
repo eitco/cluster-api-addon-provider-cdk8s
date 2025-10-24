@@ -114,13 +114,19 @@ spec:
                   reference:
                     description: Reference is the git reference (branch, tag, or commit).
                     type: string
-                  referencePollInterval:
+                  secretKey:
+                    description: SecretKey is the key within the SecretRef secret.
+                    type: string
+                  secretRef:
                     description: |-
-                      ReferencePollInterval polls the defined git repository for changes.
-                      Defaults to 5 min.
+                      SecretRef references to a secret with the
+                      needed token, used to pull from a private repository.
                     type: string
                   url:
-                    description: URL is the git repository URL.
+                    description: |-
+                      URL is the git repository URL.
+                      If the Repository is private,
+                      the URL needs to be provided in the form of 'git@github.com:...'
                     type: string
                 required:
                 - path

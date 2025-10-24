@@ -76,12 +76,7 @@ spec:
   gitRepository:
     url: "https://github.com/eitco/cluster-api-addon-provider-cdk8s"
     reference: "main"
-    referencePollInterval: "5m"
     path: "examples/cdk8s-sample-deployment"
   clusterSelector: {}
 EOF
 ```
-
-### more examples:
-https://github.com/PatrickLaabs/cdk8s-sample-deployment/tree/main
-https://github.com/PatrickLaabs/cdk8s-sample-deployment-typescript

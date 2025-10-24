@@ -44,7 +44,7 @@ export GO111MODULE=on
 
 DOCKERFILE_CONTAINER_IMAGE ?= docker.io/docker/dockerfile:1.4
 DEPLOYMENT_BASE_IMAGE ?= alpine
-DEPLOYMENT_BASE_IMAGE_TAG ?= 3.20
+DEPLOYMENT_BASE_IMAGE_TAG ?= 3.22.2
 BUILD_CONTAINER_ADDITIONAL_ARGS ?=
 
 #
@@ -220,7 +220,7 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
 #TAG ?= dev
-TAG ?= v1.0.0-alpha.8
+TAG ?= v1.0.0-alpha.9-28
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 #ppc64le s390 arm
 

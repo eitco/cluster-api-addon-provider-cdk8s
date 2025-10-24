@@ -18,9 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
-	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -49,12 +47,6 @@ func (c *Cdk8sAppProxy) Default() {
 	// Set the default git reference if not specified
 	if c.Spec.GitRepository != nil && c.Spec.GitRepository.Reference == "" {
 		c.Spec.GitRepository.Reference = "main"
-	}
-
-	if c.Spec.GitRepository != nil && c.Spec.GitRepository.ReferencePollInterval == nil {
-		c.Spec.GitRepository.ReferencePollInterval = &metav1.Duration{
-			Duration: 5 * time.Minute,
-		}
 	}
 
 	// Set the default path if not specified
