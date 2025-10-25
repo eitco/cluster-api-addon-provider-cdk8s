@@ -23,15 +23,15 @@ const (
 	// DeploymentProgressingCondition indicates that the cdk8s application deployment is progressing.
 	DeploymentProgressingCondition clusterv1.ConditionType = "DeploymentProgressing"
 	// SynthCondition indicates that synthing the cdk8s code is progressing.
-  SynthCondition = "SynthProgressing"
+	SynthCondition = "SynthProgressing"
 	// SynthFailedReason indicates that synthing the cdk8s code failed.
-  SynthFailedReason = "SynthFailed"
+	SynthFailedReason = "SynthFailed"
 	// ApplyResourcesCondition indicates that applying the resources is progressing.
-  ApplyResourcesCondition = "ApplyingResources"
+	ApplyResourcesCondition = "ApplyingResources"
 	// ApplyResourcesFailedReason indicates that applying the resources failed on the target cluster.
-  ApplyResourcesFailedReason = "ApplyingResourcesFailed"
+	ApplyResourcesFailedReason = "ApplyingResourcesFailed"
 	// GitCloneCondition indicates that the cloning of a git repository is progressing.
-  GitCloneCondition = "GitCloningProgressing"
+	GitCloneCondition = "GitCloningProgressing"
 	// GitCloneFailedReason indicates that the cloning of the git repository failed.
 	GitCloneFailedReason = "GitCloneFailed"
 )

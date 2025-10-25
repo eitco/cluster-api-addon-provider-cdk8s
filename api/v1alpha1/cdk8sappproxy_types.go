@@ -29,14 +29,15 @@ type GitRepositorySpec struct {
 	// +kubebuilder:validation:Required
 	URL string `json:"url"`
 
-	// Reference is the git reference (branch, tag, or commit).
-	// +kubebuilder:validation:Required
-	Reference string `json:"reference"`
+	// Reference (optional) defines the branch, tag or hash which CAAPC
+	// will pull from. If left empty, defaults to 'main'.
+	// +kubebuilder:validation:optional
+	Reference string `json:"reference,omitempty"`
 
-	// Path is the path within the repository where the cdk8s application is located.
+	// Path (optional) is the path within the repository where the cdk8s application is located.
 	// Defaults to the root of the repository.
-	// +kubebuilder:validation:Required
-	Path string `json:"path"`
+	// +kubebuilder:validation:optional
+	Path string `json:"path,omitempty"`
 
 	// SecretRef references to a secret with the
 	// needed token, used to pull from a private repository.
