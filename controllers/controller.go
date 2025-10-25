@@ -18,86 +18,213 @@ package controllers
 
 import (
 	"context"
-	
+	"os"
+
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
-	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gitoperator "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/git"
+	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/resourcer"
+	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/synthesizer"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
 const (
 	Finalizer = "cdk8sappproxy.addons.cluster.x-k8s.io/finalizer"
 )
 
+type Reconciler struct {
+	client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+}
+
 // SetupWithManager sets up the controller with the Manager.
-func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		WithOptions(options).
 		For(&addonsv1alpha1.Cdk8sAppProxy{}).
-		Watches(&clusterv1.Cluster{},
-			handler.EnqueueRequestsFromMapFunc(r.ClusterToCdk8sAppProxyMapper)).
+		Watches(
+		  &clusterv1.Cluster{},
+	    handler.EnqueueRequestsFromMapFunc(r.ClusterToCdk8sAppProxyMapper),
+		).
 		Complete(r)
+}
+
+//+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=cdk8sappproxies,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=cdk8sappproxies/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=cdk8sappproxies/finalizers,verbs=update
+//+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch
+//+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters/status,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controller ctrl.Result, err error) {
+	logger := log.FromContext(ctx).WithValues("cdk8sappproxy", req.NamespacedName)
+	logger.Info("Starting Reconciler")
+
+	gitImpl := &gitoperator.GitImplementer{}
+	synthImpl := &synthesizer.Implementer{}
+	resourcerImpl := &resourcer.Implementer{
+		Client: r.Client,
+	}
+	cdk8sAppProxy := &addonsv1alpha1.Cdk8sAppProxy{}
+
+	if err := r.Get(ctx, req.NamespacedName, cdk8sAppProxy); err != nil {
+		if apierrors.IsNotFound(err) {
+			logger.Error(err, "cdk8sAppProxy resource not found")
+
+			return ctrl.Result{}, err
+		}
+
+		logger.Error(err, "Failed to get cdk8sAppProxy")
+
+		return ctrl.Result{}, err
+	}
+
+	repoURL := cdk8sAppProxy.Spec.GitRepository.URL
+	branch := cdk8sAppProxy.Spec.GitRepository.Reference
+	directory := "/tmp/cdk8s-"+cdk8sAppProxy.Namespace+"-"+cdk8sAppProxy.Name+"-"+branch
+	secretKey := cdk8sAppProxy.Spec.GitRepository.SecretKey
+	secretName := cdk8sAppProxy.Spec.GitRepository.SecretRef
+	var secretRef []byte
+	var ok bool
+
+	if secretName != "" {
+		logger.Info("SecretRef provided, fetching secret from cluster", "secretName", secretName)
+
+		namespacedSecretKey := types.NamespacedName{
+			Namespace: cdk8sAppProxy.Namespace,
+			Name:      secretName,
+		}
+
+		secret := &corev1.Secret{}
+		if err = r.Get(ctx, namespacedSecretKey, secret); err != nil {
+			logger.Error(err, "Error getting the Secret specified in SecretRef")
+
+			return ctrl.Result{}, err
+		}
+
+		secretRef, ok = secret.Data[secretKey]
+		if !ok {
+			logger.Error(err, "secret '%s' does not contain data key '%s'", secretName, secretKey)
+
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Check access before (interface)Cloning
+	_, requiredAuth, err := gitImpl.CheckAccess(repoURL, secretRef, logger)
+	if err != nil {
+		logger.Error(err, "Failed to check repository access")
+
+		return ctrl.Result{}, err
+	}
+
+	if requiredAuth && len(secretRef) == 0 {
+		logger.Error(err, "Repository requires authentication but no secretRef was provided.")
+
+		return ctrl.Result{}, err
+	}
+
+	logger.Info("Checking if directory already exists")
+	if _, err := os.Stat(directory); os.IsNotExist(err) {
+		// Proceed with cloning knowing wether to use authentication
+		// Controlflow first tries no authentication and then provides a secretRef
+		if !requiredAuth {
+			secretRef = nil
+		}
+
+		logger.Info("Cloning Repo")
+		err = gitImpl.Clone(repoURL, secretRef, directory, logger)
+		if err != nil {
+			logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
+			conditions.MarkFalse(cdk8sAppProxy, addonsv1alpha1.GitCloneCondition, addonsv1alpha1.GitCloneFailedReason, clusterv1.ConditionSeverityError, "Failed to clone the git repository") 
+
+			return ctrl.Result{}, err
+		}
+
+		logger.Info("Parsing resources and synthing")
+		parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
+		if err != nil {
+			logger.Error(err, "failed to synthesize resources")
+			conditions.MarkFalse(cdk8sAppProxy, addonsv1alpha1.SynthCondition, addonsv1alpha1.SynthFailedReason, clusterv1.ConditionSeverityError, "Failed to synth cdk8s code")
+
+			return ctrl.Result{}, err
+		}
+
+		logger.Info("Applying Synthed Code")
+		err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
+		if err != nil {
+			logger.Error(err, "failed to apply resources")
+		  conditions.MarkFalse(cdk8sAppProxy, addonsv1alpha1.ApplyResourcesCondition, addonsv1alpha1.ApplyResourcesFailedReason, clusterv1.ConditionSeverityError, "Failed to apply cdk8s resources to the target cluster") 	
+
+			return ctrl.Result{}, err
+		}
+		logger.Info("Successfully applied resources")
+
+		conditions.MarkTrue(cdk8sAppProxy, clusterv1.ReadyCondition)
+		if err = r.Status().Update(ctx, cdk8sAppProxy); err != nil {
+			logger.Error(err, "failed to update cdk8sAppProxy status")
+
+			return ctrl.Result{}, err
+		}
+	}
+
+	return ctrl.Result{}, err
 }
 
 // ClusterToCdk8sAppProxyMapper is a handler.ToRequestsFunc to be used to enqeue requests for Cdk8sAppProxyReconciler.
 // It maps CAPI Cluster events to Cdk8sAppProxy events.
-func (r *Reconciler) ClusterToCdk8sAppProxyMapper(ctx context.Context, o client.Object) (requests []ctrl.Request) {
+func (r *Reconciler) ClusterToCdk8sAppProxyMapper(ctx context.Context, o client.Object) (results []ctrl.Request) {
 	logger := log.FromContext(ctx)
+
 	cluster, ok := o.(*clusterv1.Cluster)
 	if !ok {
-		logger.Error(errors.Errorf("unexpected type %T, expected Cluster", o), "failed to cast object to Cluster", "object", o)
+		logger.Info("Failed to get clusters")
 
-		return requests
+		return results
 	}
 
-	logger = logger.WithValues("clusterName", cluster.Name, "clusterNamespace", cluster.Namespace)
-	logger.Info("ClusterToCdk8sAppProxyMapper triggered for cluster")
-
+	logger = log.FromContext(ctx).WithValues("clusterName", cluster.Name, "clusterNamespace", cluster.Namespace)
+	
 	proxies := &addonsv1alpha1.Cdk8sAppProxyList{}
-	// List all Cdk8sAppProxies in the same namespace as the Cluster.
-	// Adjust if Cdk8sAppProxy can be in a different namespace or cluster-scoped.
-	// For now, assuming Cdk8sAppProxy is namespace-scoped and in the same namespace as the triggering Cluster's Cdk8sAppProxy object (which is usually the management cluster's default namespace).
-	// However, Cdk8sAppProxy resources themselves select clusters across namespaces.
-	// So, we should list Cdk8sAppProxies from all namespaces if the controller has cluster-wide watch permissions for them.
-	// If the controller is namespace-scoped for Cdk8sAppProxy, this list will be limited.
-	// For this example, let's assume a cluster-wide list for Cdk8sAppProxy.
-	if err := r.List(ctx, proxies); err != nil { // staticcheck: QF1008
+
+	if err := r.List(ctx, proxies); err != nil {
 		logger.Error(err, "failed to list Cdk8sAppProxies")
 
-		return requests
+		return results
 	}
-	logger.Info("Checking Cdk8sAppProxies for matches", "count", len(proxies.Items))
 
 	for _, proxy := range proxies.Items {
-		proxyLogger := logger.WithValues("cdk8sAppProxyName", proxy.Name, "cdk8sAppProxyNamespace", proxy.Namespace)
-		proxyLogger.Info("Evaluating Cdk8sAppProxy")
-
 		selector, err := metav1.LabelSelectorAsSelector(&proxy.Spec.ClusterSelector)
 		if err != nil {
-			proxyLogger.Error(err, "failed to parse ClusterSelector for Cdk8sAppProxy")
+			logger.Error(err, "failed to parse ClusterSelector for Cdk8sAppProxy")
 
 			continue
 		}
-		proxyLogger.Info("Parsed ClusterSelector", "selector", selector.String())
 
 		if selector.Matches(labels.Set(cluster.GetLabels())) {
-			proxyLogger.Info("Cluster labels match Cdk8sAppProxy selector, enqueuing request")
-			requests = append(requests, ctrl.Request{
+			results = append(results, ctrl.Request{
 				NamespacedName: client.ObjectKey{
 					Namespace: proxy.Namespace,
 					Name:      proxy.Name,
 				},
 			})
 		} else {
-			proxyLogger.Info("Cluster labels do not match Cdk8sAppProxy selector")
+			logger.Info("Cluster labels do not match Cdk8sAppProxy selector")
 		}
 	}
 
-	logger.Info("ClusterToCdk8sAppProxyMapper finished", "requestsEnqueued", len(requests))
-
-	return requests
+	return results
 }

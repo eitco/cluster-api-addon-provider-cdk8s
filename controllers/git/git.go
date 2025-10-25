@@ -29,64 +29,6 @@ type GitOperator interface {
 // GitImplementer implements the GitOperator interface.
 type GitImplementer struct{}
 
-func (g *GitImplementer) CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error) {
-	remoteRepo := git.NewRemote(nil, &config.RemoteConfig{
-		URLs: []string{repoURL},
-	})
-
-	// publicRepository
-	_, err = remoteRepo.List(&git.ListOptions{
-		Auth: nil,
-	})
-
-	if err == nil {
-		logger.Info("Repository is publicly accessible")
-		accessible = true
-		requiresAuth = false
-
-		return accessible, requiresAuth, nil
-	}
-
-	auth, err := getSSHAuth(secretRef, logger)
-	if err != nil {
-		logger.Error(err, "Failed to run getSSHAuth")
-		accessible = false
-		requiresAuth = true
-
-		return accessible, requiresAuth, err
-	}
-
-	// privateRepository
-	_, err = remoteRepo.List(&git.ListOptions{
-		Auth: auth,
-	})
-
-	if err == nil {
-		logger.Error(err, "Repository is privatly accessible")
-		accessible = true
-		requiresAuth = true
-
-		return accessible, requiresAuth, nil
-	}
-
-	return accessible, requiresAuth, err
-}
-
-func getSSHAuth(secretRef []byte, logger logr.Logger) (auth transport.AuthMethod, err error) {
-	if len(secretRef) == 0 {
-		logger.Error(err, "secretRef reference is empty")
-	}
-
-	auth, err = ssh.NewPublicKeys("git", secretRef, "")
-	if err != nil {
-		logger.Error(err, "Failed on retrieve the token from the tokenContent")
-
-		return auth, err
-	}
-
-	return auth, err
-}
-
 // Clone clones the given repoURLsitory to a local directory.
 func (g *GitImplementer) Clone(repoURL string, secretRef []byte, directory string, logger logr.Logger) (err error) {
 	var auth transport.AuthMethod
@@ -101,19 +43,19 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, directory strin
 
 	// Check if repoURL and directory are empty.
 	logger.Info("Checking if repoURL and or directory is empty")
-	if empty(repoURL, directory) {
-		logger.Error(err, "repoURL and or directory is empty", "repoURL", repoURL, "directory", directory)
+	if directory == "" {
+		logger.Error(err, "Directory is empty", "directory", directory)
 
 		return err
 	}
 
 	if secretRef != nil {
-    auth, err = getSSHAuth(secretRef, logger)
-	  if err != nil {
-		  logger.Error(err, "Failed to run getSSHAuth")
+		auth, err = getSSHAuth(secretRef, logger)
+		if err != nil {
+			logger.Error(err, "Failed to run getSSHAuth")
 
 			return err
-	  }
+		}
 	}
 
 	logger.Info("Plain Cloning repoURL")
@@ -137,8 +79,8 @@ func (g *GitImplementer) Poll(repoURL string, secretRef []byte, branch string, d
 	changes = false
 
 	// Check if repoURL and directory are empty.
-	if empty(repoURL, directory) {
-		logger.Error(err, "repoURL and or directory is empty", "repoURL", repoURL, "directory", directory)
+	if directory == "" {
+		logger.Error(err, "Directory is empty", "directory", directory)
 
 		return changes, err
 	}
@@ -173,6 +115,65 @@ func (g *GitImplementer) Hash(repoURL string, secretRef []byte, branch string, l
 
 	return g.localHash(repoURL, logger)
 }
+
+func (g *GitImplementer) CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error) {
+	remoteRepo := git.NewRemote(nil, &config.RemoteConfig{
+		URLs: []string{repoURL},
+	})
+
+	// publicRepository
+	_, err = remoteRepo.List(&git.ListOptions{
+		Auth: nil,
+	})
+
+	if err == nil {
+		logger.Info("Repository is publicly accessible")
+		accessible = true
+		requiresAuth = false
+
+		return accessible, requiresAuth, nil
+	}
+
+	auth, err := getSSHAuth(secretRef, logger)
+	if err != nil {
+		logger.Error(err, "Failed to run getSSHAuth")
+		accessible = false
+		requiresAuth = true
+
+		return accessible, requiresAuth, err
+	}
+
+	// privateRepository
+	_, err = remoteRepo.List(&git.ListOptions{
+		Auth: auth,
+	})
+
+	if err == nil {
+		logger.Info("Repository is privatly accessible")
+		accessible = true
+		requiresAuth = true
+
+		return accessible, requiresAuth, nil
+	}
+
+	return accessible, requiresAuth, err
+}
+
+func getSSHAuth(secretRef []byte, logger logr.Logger) (auth transport.AuthMethod, err error) {
+	if len(secretRef) == 0 {
+		logger.Error(err, "secretRef reference is empty")
+	}
+
+	auth, err = ssh.NewPublicKeys("git", secretRef, "")
+	if err != nil {
+		logger.Error(err, "Failed on retrieve the token from the tokenContent")
+
+		return auth, err
+	}
+
+	return auth, err
+}
+
 
 // localHash retrieves the HEAD commit hash from a local repository.
 func (g *GitImplementer) localHash(path string, logger logr.Logger) (hash string, err error) {
@@ -242,15 +243,6 @@ func isURL(repoURL string) bool {
 	}
 
 	if strings.Contains(repoURL, "@") && strings.Contains(repoURL, ":") {
-		return true
-	}
-
-	return false
-}
-
-// empty checks if the repoURL and directory strings are empty.
-func empty(repoURL string, directory string) bool {
-	if repoURL == "" || directory == "" {
 		return true
 	}
 
