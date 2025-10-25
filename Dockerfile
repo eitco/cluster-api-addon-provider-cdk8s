@@ -25,7 +25,7 @@ ARG goprivate
 FROM ${deployment_base_image}:${deployment_base_image_tag} AS sshbuilder
 WORKDIR /ssh
 
-RUN apk add --no-cache openssh openssh-client
+RUN apk add --no-cache openssh=10.0_p1-r9 openssh-client=10.0_p1-r9
 
 COPY ./hack/update-ssh-known-hosts.sh ./
 

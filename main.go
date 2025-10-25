@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/cluster-api/util/flags"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
@@ -207,7 +208,7 @@ func main() {
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
 		Recorder: mgr.GetEventRecorderFor("cdk8sappproxy-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: cdk8sAppProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cdk8sAppProxy")
 		os.Exit(1)
 	}

@@ -38,7 +38,7 @@ type GitRepositorySpec struct {
 	// +kubebuilder:validation:Required
 	Path string `json:"path"`
 
-	// SecretRef references to a secret with the 
+	// SecretRef references to a secret with the
 	// needed token, used to pull from a private repository.
 	// +kubebuilder:validation:optional
 	SecretRef string `json:"secretRef,omitempty"`
@@ -64,14 +64,6 @@ type Cdk8sAppProxyStatus struct {
 	// Conditions defines the current state of the Cdk8sAppProxy.
 	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
-
-	// ObservedGeneration is the last generation observed by the controller.
-	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
-
-	// Revision is the current revision of the cdk8sproxyapp.
-	// +optional
-	// Revision int `json:"revision,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -79,7 +71,6 @@ type Cdk8sAppProxyStatus struct {
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status"
 // +kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].reason"
 // +kubebuilder:printcolumn:name="Message",type="string",priority=1,JSONPath=".status.conditions[?(@.type=='Ready')].message"
-// +kubebuilder:printcolumn:name="ObservedGen",type="integer",JSONPath=".status.observedGeneration"
 // +kubebuilder:resource:shortName=cap
 
 // Cdk8sAppProxy is the Schema for the cdk8sappproxies API.

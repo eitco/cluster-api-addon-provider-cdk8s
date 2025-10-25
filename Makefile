@@ -221,7 +221,7 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 #TAG ?= dev
 # Next release v1.0.0-alpha.11
-TAG ?= v1.0.0-alpha.10
+TAG ?= v1.0.0-alpha.11-8
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 ppc64le
 

@@ -7,5 +7,5 @@ spec:
   template:
     spec:
       containers:
-      - image: ghcr.io/eitco/cluster-api-addon-provider-cdk8s/cluster-api-cdk8s-controller-ppc64le:v1.0.0-alpha.10
+      - image: ghcr.io/eitco/cluster-api-addon-provider-cdk8s/cluster-api-cdk8s-controller:v1.0.0-alpha.11-7
         name: manager

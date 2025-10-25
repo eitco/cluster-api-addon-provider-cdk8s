@@ -1,3 +1,5 @@
+// Package resourcer provides interfaces to apply and check resources
+// we want to deploy to a target cluster.
 package resourcer
 
 import (
@@ -13,7 +15,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -51,18 +52,9 @@ func (i *Implementer) Apply(ctx context.Context, cdk8sAppProxy *addonsv1alpha1.C
 			_, err = c.Resource(gvr).Namespace(resources.GetNamespace()).Apply(ctx, resources.GetName(), resources, applyOpts)
 			if err != nil {
 				logger.Error(err, "failed to apply resource")
-				conditions.MarkFalse(cdk8sAppProxy, addonsv1alpha1.DeploymentProgressingCondition, addonsv1alpha1.ResourceApplyFailedReason, clusterv1.ConditionSeverityError, "Failed to apply resource to target clusters.")
 
 				break
 			}
-		}
-
-		cdk8sAppProxy.Status.ObservedGeneration = cdk8sAppProxy.Generation
-		conditions.MarkTrue(cdk8sAppProxy, addonsv1alpha1.DeploymentProgressingCondition)
-		if err = i.Status().Update(ctx, cdk8sAppProxy); err != nil {
-			logger.Error(err, "failed to update cdk8sAppProxy status")
-
-			return err
 		}
 	}
 
