@@ -174,7 +174,6 @@ func getSSHAuth(secretRef []byte, logger logr.Logger) (auth transport.AuthMethod
 	return auth, err
 }
 
-
 // localHash retrieves the HEAD commit hash from a local repository.
 func (g *GitImplementer) localHash(path string, logger logr.Logger) (hash string, err error) {
 	localRepo, err := git.PlainOpen(path)

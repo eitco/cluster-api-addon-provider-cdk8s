@@ -27,8 +27,6 @@ type: Opaque
 
 ```
 
-It is important to notice, that the key must be 'api-token'. We might switch this in future version.
-
 ### Cdk8sAppProxy Resource example
 ```
 ---
@@ -47,3 +45,5 @@ spec:
   clusterSelector: {}
 
 ```
+
+To learn more about a specific key, please refer to our API implementation, or use `kubectl explain cdk8sappproxy`.
