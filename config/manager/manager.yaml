@@ -53,7 +53,7 @@ spec:
           name: manager
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false # We currently need to readOnlyRootFilesystem as false.
             capabilities:
               drop:
                 - ALL

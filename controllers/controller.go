@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -149,7 +149,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		err = gitImpl.Clone(repoURL, secretRef, directory, logger)
 		if err != nil {
 			logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
-			conditions.MarkFalse(cdk8sAppProxy, addonsv1alpha1.GitCloneCondition, addonsv1alpha1.GitCloneFailedReason, clusterv1.ConditionSeverityError, "Failed to clone the git repository")
+			conditions.Set(cdk8sAppProxy, metav1.Condition{
+				Type: clusterv1.AvailableCondition,
+				Status: metav1.ConditionFalse,
+				Reason: "Failed",
+				Message: "Failed to clone Git Repository",
+			})
 
 			return ctrl.Result{}, err
 		}
@@ -157,7 +162,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
 		if err != nil {
 			logger.Error(err, "failed to synthesize resources")
-			conditions.MarkFalse(cdk8sAppProxy, addonsv1alpha1.SynthCondition, addonsv1alpha1.SynthFailedReason, clusterv1.ConditionSeverityError, "Failed to synth cdk8s code")
+			conditions.Set(cdk8sAppProxy, metav1.Condition{
+				Type: clusterv1.AvailableCondition,
+				Status: metav1.ConditionFalse,
+				Reason: "Failed",
+				Message: "Failed to synth cdk8s code",
+			})
 
 			return ctrl.Result{}, err
 		}
@@ -165,12 +175,23 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
 		if err != nil {
 			logger.Error(err, "failed to apply resources")
-			conditions.MarkFalse(cdk8sAppProxy, addonsv1alpha1.ApplyResourcesCondition, addonsv1alpha1.ApplyResourcesFailedReason, clusterv1.ConditionSeverityError, "Failed to apply cdk8s resources to the target cluster")
+	    conditions.Set(cdk8sAppProxy, metav1.Condition{
+				Type: clusterv1.AvailableCondition,
+				Status: metav1.ConditionFalse,
+				Reason: "Failed",
+				Message: "Failed to apply resources",
+			})
 
 			return ctrl.Result{}, err
 		}
 
-		conditions.MarkTrue(cdk8sAppProxy, clusterv1.ReadyCondition)
+		conditions.Set(cdk8sAppProxy, metav1.Condition{
+      Type: clusterv1.ReadyCondition,
+			Status: metav1.ConditionTrue,
+			Reason: "Successful",
+			Message: "Cdk8sAppProxy is ready",
+		})
+
 		if err = r.Status().Update(ctx, cdk8sAppProxy); err != nil {
 			logger.Error(err, "failed to update cdk8sAppProxy status")
 

@@ -219,9 +219,9 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
-#TAG ?= dev
+TAG ?= dev
 # Next release v1.0.0-alpha.11
-TAG ?= v1.0.0-alpha.11-10
+# TAG ?= v1.0.0-alpha.11-13
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 ppc64le
 
@@ -237,7 +237,7 @@ PULL_POLICY ?= Always
 # Hosts running SELinux need :z added to volume mounts
 SELINUX_ENABLED := $(shell cat /sys/fs/selinux/enforce 2> /dev/null || echo 0)
 
-ifeq ($(SELINUX_ENABLED),1)
+ifeq ($(SELINUX_ENABLED),0)
   DOCKER_VOL_OPTS?=:z
 endif
 
