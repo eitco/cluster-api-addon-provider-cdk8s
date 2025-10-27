@@ -6,8 +6,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/secret"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,8 +61,8 @@ var (
 				},
 			},
 			Spec: clusterv1.ClusterSpec{
-				ClusterNetwork: &clusterv1.ClusterNetwork{
-					APIServerPort: ptr.To(int32(1234)),
+				ClusterNetwork: clusterv1.ClusterNetwork{
+					APIServerPort: int32(1234),
 				},
 			},
 		}
@@ -139,7 +138,13 @@ var _ = Describe("Testing Cdk8sAppproxy Reconcile", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			patch := client.MergeFrom(cluster.DeepCopy())
-			conditions.MarkTrue(cluster, clusterv1.ControlPlaneInitializedCondition)
+			// conditions.MarkTrue(cluster, clusterv1.ControlPlaneInitializedCondition)
+			conditions.Set(cluster, metav1.Condition{
+        Type: clusterv1.ClusterControlPlaneInitializedCondition,
+				Status: metav1.ConditionTrue,
+				Reason: "Successful",
+			  Message: "Cdk8sAppProxy is ready",
+			})
 			err = k8sClient.Status().Patch(ctx, cluster, patch)
 			Expect(err).ToNot(HaveOccurred())
 

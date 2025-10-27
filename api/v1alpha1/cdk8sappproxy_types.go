@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 // GitRepositorySpec defines the desired state of a Git repository source.
@@ -64,7 +63,8 @@ type Cdk8sAppProxySpec struct {
 type Cdk8sAppProxyStatus struct {
 	// Conditions defines the current state of the Cdk8sAppProxy.
 	// +optional
-	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+	// Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -83,13 +83,11 @@ type Cdk8sAppProxy struct {
 	Status Cdk8sAppProxyStatus `json:"status,omitempty"`
 }
 
-// GetConditions returns the list of conditions for an Cdk8sAppProxy API object.
-func (c *Cdk8sAppProxy) GetConditions() clusterv1.Conditions {
+func (c *Cdk8sAppProxy) GetConditions() []metav1.Condition {
 	return c.Status.Conditions
 }
 
-// SetConditions sets the conditions on an Cdk8sAppProxy API object.
-func (c *Cdk8sAppProxy) SetConditions(conditions clusterv1.Conditions) {
+func (c *Cdk8sAppProxy) SetConditions(conditions []metav1.Condition) {
 	c.Status.Conditions = conditions
 }
 
