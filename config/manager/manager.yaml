@@ -53,7 +53,7 @@ spec:
           name: manager
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -83,9 +83,9 @@ spec:
             - mountPath: /tmp
               name: tmp
       volumes:
-        - emptyDir: {}
+        - emptyDir:
+            sizeLimit: 1Gi
           name: tmp
-          # TODO(user): Configure the resources accordingly based on the project requirements.
           # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
           # resources:
           #   limits:
