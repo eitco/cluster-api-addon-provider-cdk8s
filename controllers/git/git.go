@@ -41,8 +41,8 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, directory strin
 		return err
 	}
 
-	// Check if repoURL and directory are empty.
-	logger.Info("Checking if repoURL and or directory is empty")
+	// Check if directory is empty.
+	logger.Info("Checking directory is empty")
 	if directory == "" {
 		logger.Error(err, "Directory is empty", "directory", directory)
 
@@ -78,7 +78,7 @@ func (g *GitImplementer) Poll(repoURL string, secretRef []byte, branch string, d
 	// Defaults to false. We only change to true if there is a difference between the hashes.
 	changes = false
 
-	// Check if repoURL and directory are empty.
+	// Check if directory is empty.
 	if directory == "" {
 		logger.Error(err, "Directory is empty", "directory", directory)
 
