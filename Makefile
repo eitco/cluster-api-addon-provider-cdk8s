@@ -24,7 +24,7 @@ SHELL:=/usr/bin/env bash
 # Go.
 #
 GO_VERSION ?= $(shell cat go.mod | grep "toolchain" | { read _ v; echo "$${v#go}"; } | grep "[0-9]" || cat go.mod | grep "go " | head -1 | awk '{print $$2}')
-GO_CONTAINER_IMAGE ?= golang:1.25.2
+GO_CONTAINER_IMAGE ?= golang:1.25.3
 
 # Use GOPROXY environment variable if set
 GOPROXY := $(shell go env GOPROXY)
@@ -221,7 +221,7 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 TAG ?= dev
 # Next release v1.0.0-alpha.11
-# TAG ?= v1.0.0-alpha.11-15
+# TAG ?= v1.0.0-alpha.11-16
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 ppc64le
 

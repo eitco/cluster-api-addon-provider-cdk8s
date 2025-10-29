@@ -24,7 +24,7 @@ import (
 type GitRepositorySpec struct {
 	// URL is the git repository URL.
 	// If the Repository is private,
-	// the URL needs to be provided in the form of 'git@github.com:...'
+	// Valid options are: 'HTTP', 'HTTPS', and 'git@...' 
 	// +kubebuilder:validation:Required
 	URL string `json:"url"`
 
@@ -40,6 +40,7 @@ type GitRepositorySpec struct {
 
 	// SecretRef references to a secret with the
 	// needed token, used to pull from a private repository.
+	// Valid options are SSHKeys and PAT Tokens.
 	// +kubebuilder:validation:optional
 	SecretRef string `json:"secretRef,omitempty"`
 
