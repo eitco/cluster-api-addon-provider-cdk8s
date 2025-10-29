@@ -20,7 +20,7 @@ import (
 
 // GitOperator defines the interface for git operations.
 type GitOperator interface {
-	Clone(repoURL string, secretRef []byte, directory string, logger logr.Logger) (err error)
+	Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error)
 	Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error)
 	Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error)
 	CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error)
@@ -30,7 +30,7 @@ type GitOperator interface {
 type GitImplementer struct{}
 
 // Clone clones the given repoURLsitory to a local directory.
-func (g *GitImplementer) Clone(repoURL string, secretRef []byte, directory string, logger logr.Logger) (err error) {
+func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error) {
 	var auth transport.AuthMethod
 
 	logger.Info("Creating directory")
@@ -62,6 +62,7 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, directory strin
 	_, err = git.PlainClone(directory, false, &git.CloneOptions{
 		URL:   repoURL,
 		Auth:  auth,
+		ReferenceName: plumbing.ReferenceName(branch),
 		Depth: 1,
 	})
 	if err != nil {

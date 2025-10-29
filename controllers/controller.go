@@ -146,7 +146,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 			secretRef = nil
 		}
 
-		err = gitImpl.Clone(repoURL, secretRef, directory, logger)
+		err = gitImpl.Clone(repoURL, secretRef, branch, directory, logger)
 		if err != nil {
 			logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
 			conditions.Set(cdk8sAppProxy, metav1.Condition{
