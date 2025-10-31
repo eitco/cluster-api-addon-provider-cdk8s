@@ -220,8 +220,8 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
 TAG ?= dev
-# Next release v1.0.0-alpha.11
-# TAG ?= v1.0.0-alpha.11-16
+# Next release v1.0.0-alpha.12
+# TAG ?= v1.0.0-alpha.11
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 ppc64le
 
