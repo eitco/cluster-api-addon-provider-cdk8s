@@ -14,8 +14,20 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/go-logr/logr"
+)
+
+type authType string
+
+const (
+	// authTypeUnknown indicates we can't determine the auth type from the URL.
+	authTypeUnknown authType = "unknown"
+  // authTypeSSH indicates the URL is for SSH authentication.
+	authTypeSSH authType = "ssh"
+	// authTypeHTTP indicates the URL is for HTTP/S authentication.
+	authTypeHTTP authType = "http"
 )
 
 // GitOperator defines the interface for git operations.
@@ -33,7 +45,6 @@ type GitImplementer struct{}
 func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error) {
 	var auth transport.AuthMethod
 
-	logger.Info("Creating directory")
 	err = os.Mkdir(directory, 0755)
 	if err != nil {
 		logger.Error(err, "Failed to create directory", "directory", directory)
@@ -41,24 +52,15 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, 
 		return err
 	}
 
-	// Check if directory is empty.
-	logger.Info("Checking directory is empty")
-	if directory == "" {
-		logger.Error(err, "Directory is empty", "directory", directory)
-
-		return err
-	}
-
 	if secretRef != nil {
-		auth, err = getSSHAuth(secretRef, logger)
+		auth, err = getAuth(repoURL, secretRef, logger)
 		if err != nil {
-			logger.Error(err, "Failed to run getSSHAuth")
+			logger.Error(err, "Failed to run getAuth")
 
 			return err
 		}
 	}
 
-	logger.Info("Plain Cloning repoURL")
 	_, err = git.PlainClone(directory, false, &git.CloneOptions{
 		URL:   repoURL,
 		Auth:  auth,
@@ -78,13 +80,6 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, 
 func (g *GitImplementer) Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error) {
 	// Defaults to false. We only change to true if there is a difference between the hashes.
 	changes = false
-
-	// Check if directory is empty.
-	if directory == "" {
-		logger.Error(err, "Directory is empty", "directory", directory)
-
-		return changes, err
-	}
 
 	// Get hash from local repoURL.
 	localHash, err := g.Hash(directory, nil, branch, logger)
@@ -135,9 +130,9 @@ func (g *GitImplementer) CheckAccess(repoURL string, secretRef []byte, logger lo
 		return accessible, requiresAuth, nil
 	}
 
-	auth, err := getSSHAuth(secretRef, logger)
+	auth, err := getAuth(repoURL, secretRef, logger)
 	if err != nil {
-		logger.Error(err, "Failed to run getSSHAuth")
+		logger.Error(err, "Failed to run getAuth")
 		accessible = false
 		requiresAuth = true
 
@@ -160,19 +155,67 @@ func (g *GitImplementer) CheckAccess(repoURL string, secretRef []byte, logger lo
 	return accessible, requiresAuth, err
 }
 
-func getSSHAuth(secretRef []byte, logger logr.Logger) (auth transport.AuthMethod, err error) {
+func getAuth(repoURL string, secretRef []byte, logger logr.Logger) (auth transport.AuthMethod, err error) {
 	if len(secretRef) == 0 {
 		logger.Error(err, "secretRef reference is empty")
+		// conditions.Set(cdk8sAppProxy, metav1.Condition{
+		// 		Type: clusterv1.AvailableCondition,
+		// 		Status: metav1.ConditionFalse,
+		// 		Reason: "Failed",
+		// 		Message: "Failed to clone Git Repository",
+		// 	})
+
+		return auth, err
 	}
 
-	auth, err = ssh.NewPublicKeys("git", secretRef, "")
-	if err != nil {
-		logger.Error(err, "Failed on retrieve the token from the tokenContent")
+	urlType := getURLType(repoURL)
+
+	switch urlType {
+	case authTypeHTTP:
+		logger.Info("Using HTTP Basic Auth (PAT) for URL", "url", repoURL)
+    auth = &http.BasicAuth{
+			Username: "oauth2",
+			Password: string(secretRef),
+		}
+
+    return auth, err
+	case authTypeSSH:
+		logger.Info("Using SSH Key Auth for URL", "url", repoURL)
+		auth, err = ssh.NewPublicKeys("git", secretRef, "")
+		if err != nil {
+			logger.Error(err, "Failed on process the SSH token for URL", "url", repoURL)
+
+			return auth, err
+		}
+	case authTypeUnknown:
+	  logger.Info("unknown type")
+
+	  fallthrough
+	default:
+		logger.Error(err, "unknown or unsupported URL scheme for auth")
 
 		return auth, err
 	}
 
 	return auth, err
+}
+
+func getURLType(repoURL string) authType{
+  if strings.HasPrefix(repoURL, "http://") || strings.HasPrefix(repoURL, "https://") {
+		return authTypeHTTP
+	}
+	
+	// Covers ssh://user@host/repo.git
+	if strings.HasPrefix(repoURL, "ssh://") {
+		return authTypeSSH
+	}
+
+	// Covers git@host:repo.git
+	if strings.Contains(repoURL, "@") && strings.Contains(repoURL, ":") && !strings.HasPrefix(repoURL, "http") {
+		return authTypeSSH
+	}
+
+  return authTypeUnknown
 }
 
 // localHash retrieves the HEAD commit hash from a local repository.
@@ -196,13 +239,7 @@ func (g *GitImplementer) localHash(path string, logger logr.Logger) (hash string
 }
 
 func (g *GitImplementer) remoteHash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
-	if branch == "" {
-		logger.Error(err, "Branch is empty")
-
-		return hash, err
-	}
-
-	auth, err := getSSHAuth(secretRef, logger)
+	auth, err := getAuth(repoURL, secretRef, logger)
 	if err != nil {
 		return hash, err
 	}
@@ -234,9 +271,6 @@ func (g *GitImplementer) remoteHash(repoURL string, secretRef []byte, branch str
 
 // isURL checks if the given string is a valid URL.
 func isURL(repoURL string) bool {
-	if repoURL == "" {
-		return false
-	}
 	parsedURL, err := url.ParseRequestURI(repoURL)
 	if err == nil && parsedURL.Scheme != "" {
 		return true

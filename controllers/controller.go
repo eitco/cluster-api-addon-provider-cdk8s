@@ -71,6 +71,7 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controller ctrl.Result, err error) {
+	// logs := ctrl.LoggerFrom(ctx).WithValues("cdk8sappproxy", req.NamespacedName)
 	logger := log.FromContext(ctx).WithValues("cdk8sappproxy", req.NamespacedName)
 	logger.Info("Starting Reconciler")
 
