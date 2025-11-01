@@ -5,3 +5,14 @@ testbin/
 
 examples/
 graphs/
+test/
+docs/
+hack/tools/
+logos/
+
+code-of-conduct.md
+CONTRIBUTING.md
+LICENSE
+PROJECT
+SECURITY_CONTACTS
+tilt-provider.yaml

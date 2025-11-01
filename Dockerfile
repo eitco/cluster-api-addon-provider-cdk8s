@@ -93,7 +93,18 @@ RUN apk add --no-cache ca-certificates=20250911-r0 curl=8.14.1-r2 nodejs=22.16.0
     && curl -fsSL -o go1.25.3.linux-${ARCH}.tar.gz https://go.dev/dl/go1.25.3.linux-${ARCH}.tar.gz \
     && tar -C /usr/local -xzf go1.25.3.linux-${ARCH}.tar.gz \
     && rm go1.25.3.linux-${ARCH}.tar.gz \
-    && rm -rf /tmp/*
+    && npm cache clean --force \
+    && rm -rf /root/.npm \
+    && rm -rf /usr/local/go/doc \
+    && rm -rf /usr/local/go/api \
+    && rm -rf /usr/local/go/test \
+    && rm -rf /usr/local/go/pkg/linux_* \
+    && rm -rf /usr/local/go/pkg/tool/linux_*/cgo \
+    && rm -rf /usr/local/go/pkg/tool/linux_*/cover \
+    && rm -rf /usr/local/go/pkg/tool/linux_*/doc \
+    && rm -rf /usr/local/go/pkg/tool/linux_*/fix \
+    && rm -rf /usr/local/go/pkg/tool/linux_*/trace \
+    && rm -rf /var/cache/apk/*
 
 # Set Go environment variables
 ENV PATH=$PATH:/usr/local/go/bin
