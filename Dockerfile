@@ -20,9 +20,12 @@ ARG builder_image
 ARG deployment_base_image
 ARG deployment_base_image_tag
 ARG goprivate
+ARG ARCH
+ARG package=.
+ARG ldflags
 
 # Build step only to fetch the ssh_known_hosts
-FROM ${deployment_base_image}:${deployment_base_image_tag} AS sshbuilder
+FROM alpine:3.22.2 AS sshbuilder
 WORKDIR /ssh
 
 RUN apk add --no-cache openssh=10.0_p1-r9 openssh-client=10.0_p1-r9
@@ -31,9 +34,6 @@ COPY ./hack/update-ssh-known-hosts.sh ./
 
 # Known Hosts
 RUN ./update-ssh-known-hosts.sh
-
-# Build architecture
-ARG ARCH
 
 # Ignore Hadolint rule "Always tag the version of an image explicitly."
 # It's an invalid finding since the image is explicitly set in the Makefile.
@@ -44,7 +44,6 @@ WORKDIR /workspace
 
 # Run this with docker build --build-arg goproxy=$(go env GOPROXY) to override the goproxy
 ARG goproxy=https://proxy.golang.org
-# Run this with docker build --build-arg package=./controlplane/kubeadm or --build-arg package=./bootstrap/kubeadm
 ENV GOPROXY=$goproxy
 ENV GOPRIVATE=$goprivate
 
@@ -67,11 +66,6 @@ RUN --mount=type=secret,id=netrc,required=false,target=/root/.netrc \
     --mount=type=cache,target=/go/pkg/mod \
     go build .
 
-# Build
-ARG package=.
-ARG ARCH
-ARG ldflags
-
 # Do not force rebuild of up-to-date packages (do not use -a) and use the compiler cache folder
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
@@ -79,34 +73,45 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     go build -trimpath -ldflags "${ldflags} -extldflags '-static'" \
     -o manager ${package}
 
+# Go Runtime Builder
+FROM alpine:3.22.2 AS go_runtime_builder
+ARG ARCH
+
+RUN apk add --no-cache curl tar xz
+RUN curl -fsSL -o go1.25.3.linux-${ARCH}.tar.gz https://go.dev/dl/go1.25.3.linux-${ARCH}.tar.gz \
+    && tar -C /usr/local -xzf go1.25.3.linux-${ARCH}.tar.gz \
+    && rm go1.25.3.linux-${ARCH}.tar.gz 
+
+# NODE Runtime Builder
+FROM alpine:3.22.2 as node_runtime_builder
+
+RUN apk add --no-cache nodejs=22.16.0-r2 npm=11.3.0-r1  \
+    && npm install -g cdk8s-cli@2.202.3 \
+    && npm cache clean --force \
+    && rm -rf /root/.npm \
+    && rm -rf /var/cache/apk/*
+
 # Production image
 FROM ${deployment_base_image}:${deployment_base_image_tag}
 
 # Build architecture - redeclare for this stage
 ARG ARCH
 
-# Set shell with pipefail option for better error handling
-SHELL ["/bin/sh", "-o", "pipefail", "-c"]
-
-RUN apk add --no-cache ca-certificates=20250911-r0 curl=8.14.1-r2 nodejs=22.16.0-r2 npm=11.3.0-r1 \
-    && npm install -g cdk8s-cli@2.202.3 \
-    && curl -fsSL -o go1.25.3.linux-${ARCH}.tar.gz https://go.dev/dl/go1.25.3.linux-${ARCH}.tar.gz \
-    && tar -C /usr/local -xzf go1.25.3.linux-${ARCH}.tar.gz \
-    && rm go1.25.3.linux-${ARCH}.tar.gz \
-    && rm -rf /tmp/*
-
-# Set Go environment variables
-ENV PATH=$PATH:/usr/local/go/bin
-ENV GOROOT=/usr/local/go
-
 WORKDIR /
+
+COPY --from=go_runtime_builder /usr/local/go /usr/local/go
 COPY --from=builder /workspace/manager .
 COPY --from=sshbuilder /ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts
+COPY --from=node_runtime_builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+# COPY --from=node_runtime_builder /usr/local/bin/cdk8s /usr/local/bin/cdk8s
+COPY --from=node_runtime_builder /usr/local/bin /usr/local/bin
+
+# Set Go environment variables
+ENV PATH=$PATH:/usr/local/go/bin:/usr/local/bin
+ENV GOROOT=/usr/local/go
 
 # Create non-root user
-RUN adduser -u 65532 -D -h /home/nonroot -s /bin/sh nonroot
+# RUN adduser -u 65532 -D -h /home/nonroot -s /bin/sh nonroot
    
-# Switch back to non-root user (this line should already exist)
-# USER root # This was part of the removed direct install, ensure it's not re-added here unless needed for COPY permissions
-USER 65532
+# USER 65532
 ENTRYPOINT ["/manager"]

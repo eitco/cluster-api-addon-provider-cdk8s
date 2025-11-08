@@ -43,8 +43,10 @@ export GO111MODULE=on
 # Base docker images
 
 DOCKERFILE_CONTAINER_IMAGE ?= docker.io/docker/dockerfile:1.4
-DEPLOYMENT_BASE_IMAGE ?= alpine
-DEPLOYMENT_BASE_IMAGE_TAG ?= 3.22.2
+# DEPLOYMENT_BASE_IMAGE ?= alpine
+# DEPLOYMENT_BASE_IMAGE_TAG ?= 3.22.2
+DEPLOYMENT_BASE_IMAGE ?= gcr.io/distroless/static-debian13
+DEPLOYMENT_BASE_IMAGE_TAG ?= debug
 BUILD_CONTAINER_ADDITIONAL_ARGS ?=
 
 #
@@ -114,7 +116,7 @@ get_go_version = $(shell go list -f "{{.Version}}" -m $1)
 # curl retries
 CURL_RETRIES=3
 
-KUSTOMIZE_VER := v5.3.0
+KUSTOMIZE_VER := v5.7.1
 KUSTOMIZE_BIN := kustomize
 KUSTOMIZE := $(abspath $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)-$(KUSTOMIZE_VER))
 KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v5
@@ -127,22 +129,22 @@ MOCKGEN_VER := $(call get_go_version,$(MOCKGEN_PKG))
 MOCKGEN_BIN := mockgen
 MOCKGEN := $(TOOLS_BIN_DIR)/$(MOCKGEN_BIN)-$(MOCKGEN_VER)
 
-SETUP_ENVTEST_VER := release-0.19
+SETUP_ENVTEST_VER := release-0.22
 SETUP_ENVTEST_BIN := setup-envtest
 SETUP_ENVTEST := $(abspath $(TOOLS_BIN_DIR)/$(SETUP_ENVTEST_BIN)-$(SETUP_ENVTEST_VER))
 SETUP_ENVTEST_PKG := sigs.k8s.io/controller-runtime/tools/setup-envtest
 
-CONTROLLER_GEN_VER := v0.16.1
+CONTROLLER_GEN_VER := v0.19.0
 CONTROLLER_GEN_BIN := controller-gen
 CONTROLLER_GEN := $(abspath $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER))
 CONTROLLER_GEN_PKG := sigs.k8s.io/controller-tools/cmd/controller-gen
 
-GOTESTSUM_VER := v1.11.0
+GOTESTSUM_VER := v1.13.0
 GOTESTSUM_BIN := gotestsum
 GOTESTSUM := $(abspath $(TOOLS_BIN_DIR)/$(GOTESTSUM_BIN)-$(GOTESTSUM_VER))
 GOTESTSUM_PKG := gotest.tools/gotestsum
 
-CONVERSION_GEN_VER := v0.31.0
+CONVERSION_GEN_VER := v0.34.1
 CONVERSION_GEN_BIN := conversion-gen
 # We are intentionally using the binary without version suffix, to avoid the version
 # in generated files.
@@ -154,26 +156,26 @@ ENVSUBST_VER := $(call get_go_version,github.com/drone/envsubst/v2)
 ENVSUBST := $(abspath $(TOOLS_BIN_DIR)/$(ENVSUBST_BIN)-$(ENVSUBST_VER))
 ENVSUBST_PKG := github.com/drone/envsubst/v2/cmd/envsubst
 
-GO_APIDIFF_VER := v0.8.2
+GO_APIDIFF_VER := v0.8.3
 GO_APIDIFF_BIN := go-apidiff
 GO_APIDIFF := $(abspath $(TOOLS_BIN_DIR)/$(GO_APIDIFF_BIN)-$(GO_APIDIFF_VER))
 GO_APIDIFF_PKG := github.com/joelanford/go-apidiff
 
-HADOLINT_VER := v2.12.0
+HADOLINT_VER := v2.14.0
 HADOLINT_FAILURE_THRESHOLD = warning
 
-SHELLCHECK_VER := v0.9.0
+SHELLCHECK_VER := v0.11.0
 
 KPROMO_VER := v4.0.5
 KPROMO_BIN := kpromo
 KPROMO :=  $(abspath $(TOOLS_BIN_DIR)/$(KPROMO_BIN)-$(KPROMO_VER))
 KPROMO_PKG := sigs.k8s.io/promo-tools/v4/cmd/kpromo
 
-RELEASE_NOTES_VER := v0.12.0
+RELEASE_NOTES_VER := v0.18.0
 RELEASE_NOTES_BIN := release-notes
 RELEASE_NOTES := $(TOOLS_BIN_DIR)/$(RELEASE_NOTES_BIN)-$(RELEASE_NOTES_VER)
 
-YQ_VER := v4.35.2
+YQ_VER := v4.38.1
 YQ_BIN := yq
 YQ :=  $(abspath $(TOOLS_BIN_DIR)/$(YQ_BIN)-$(YQ_VER))
 YQ_PKG := github.com/mikefarah/yq/v4
@@ -219,9 +221,9 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
-TAG ?= dev
+# TAG ?= dev
 # Next release v1.0.0-alpha.12
-# TAG ?= v1.0.0-alpha.11
+TAG ?= v1.0.0-alpha.12-2
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 ppc64le
 
@@ -399,6 +401,7 @@ docker-pull-prerequisites:
 	docker pull $(DOCKERFILE_CONTAINER_IMAGE)
 	docker pull $(GO_CONTAINER_IMAGE)
 	docker pull $(DEPLOYMENT_BASE_IMAGE):$(DEPLOYMENT_BASE_IMAGE_TAG)
+  docker pull $(TOOLCHAIN_BUILDER_IMAGE):$(TOOLCHAIN_BUILDER_IMAGE_TAG)
 
 .PHONY: docker-build-all
 docker-build-all: $(addprefix docker-build-,$(ALL_ARCH)) ## Build docker images for all architectures
