@@ -24,6 +24,8 @@ SHELL:=/usr/bin/env bash
 # Go.
 #
 GO_VERSION ?= $(shell cat go.mod | grep "toolchain" | { read _ v; echo "$${v#go}"; } | grep "[0-9]" || cat go.mod | grep "go " | head -1 | awk '{print $$2}')
+# GO_BASE_CONTAINER ?= docker.io/library/golang
+# GO_CONTAINER_IMAGE ?= $(GO_BASE_CONTAINER):$(GO_VERSION)
 GO_CONTAINER_IMAGE ?= golang:1.25.3
 
 # Use GOPROXY environment variable if set
@@ -43,10 +45,11 @@ export GO111MODULE=on
 # Base docker images
 
 DOCKERFILE_CONTAINER_IMAGE ?= docker.io/docker/dockerfile:1.4
-# DEPLOYMENT_BASE_IMAGE ?= alpine
-# DEPLOYMENT_BASE_IMAGE_TAG ?= 3.22.2
-DEPLOYMENT_BASE_IMAGE ?= gcr.io/distroless/static-debian13
-DEPLOYMENT_BASE_IMAGE_TAG ?= debug
+# In order to use a distroless image, we need to identify how to solve the issue with NPM.
+# DEPLOYMENT_BASE_IMAGE ?= gcr.io/distroless/static
+# DEPLOYMENT_BASE_IMAGE_TAG ?= nonroot-${ARCH}
+DEPLOYMENT_BASE_IMAGE ?= alpine
+DEPLOYMENT_BASE_IMAGE_TAG ?= 3.22.2
 BUILD_CONTAINER_ADDITIONAL_ARGS ?=
 
 #
@@ -134,7 +137,7 @@ SETUP_ENVTEST_BIN := setup-envtest
 SETUP_ENVTEST := $(abspath $(TOOLS_BIN_DIR)/$(SETUP_ENVTEST_BIN)-$(SETUP_ENVTEST_VER))
 SETUP_ENVTEST_PKG := sigs.k8s.io/controller-runtime/tools/setup-envtest
 
-CONTROLLER_GEN_VER := v0.19.0
+CONTROLLER_GEN_VER := v0.17.2
 CONTROLLER_GEN_BIN := controller-gen
 CONTROLLER_GEN := $(abspath $(TOOLS_BIN_DIR)/$(CONTROLLER_GEN_BIN)-$(CONTROLLER_GEN_VER))
 CONTROLLER_GEN_PKG := sigs.k8s.io/controller-tools/cmd/controller-gen
@@ -223,7 +226,7 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 # TAG ?= dev
 # Next release v1.0.0-alpha.12
-TAG ?= v1.0.0-alpha.12-2
+TAG ?= v1.0.0-alpha.12-8
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 ppc64le
 
