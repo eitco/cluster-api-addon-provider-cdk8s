@@ -99,19 +99,22 @@ ARG ARCH
 
 WORKDIR /
 
+# RUN apk add --no-cache ca-certificates=20250911-r0 nodejs=22.16.0-r2 npm=11.3.0-r1 \
+RUN apk add --no-cache nodejs=22.16.0-r2 npm=11.3.0-r1 \
+    && npm install -g cdk8s-cli@2.202.3 \
+    && npm cache clean --force \
+    && rm -rf /root/.npm /tmp/* /var/cache/apk/*
+
 COPY --from=go_runtime_builder /usr/local/go /usr/local/go
 COPY --from=builder /workspace/manager .
 COPY --from=sshbuilder /ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts
-COPY --from=node_runtime_builder /usr/local/lib/node_modules /usr/local/lib/node_modules
-# COPY --from=node_runtime_builder /usr/local/bin/cdk8s /usr/local/bin/cdk8s
-COPY --from=node_runtime_builder /usr/local/bin /usr/local/bin
 
 # Set Go environment variables
 ENV PATH=$PATH:/usr/local/go/bin:/usr/local/bin
 ENV GOROOT=/usr/local/go
 
 # Create non-root user
-# RUN adduser -u 65532 -D -h /home/nonroot -s /bin/sh nonroot
+RUN adduser -u 65532 -D -h /home/nonroot -s /bin/sh nonroot
    
-# USER 65532
+USER 65532
 ENTRYPOINT ["/manager"]
