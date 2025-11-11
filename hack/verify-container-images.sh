@@ -22,7 +22,7 @@ if [[ "${TRACE-0}" == "1" ]]; then
     set -o xtrace
 fi
 
-TRIVY_VERSION=0.34.0
+TRIVY_VERSION=0.67.2
 
 GO_OS="$(go env GOOS)"
 if [[ "${GO_OS}" == "linux" ]]; then

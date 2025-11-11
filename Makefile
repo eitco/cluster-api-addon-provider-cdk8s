@@ -404,7 +404,6 @@ docker-pull-prerequisites:
 	docker pull $(DOCKERFILE_CONTAINER_IMAGE)
 	docker pull $(GO_CONTAINER_IMAGE)
 	docker pull $(DEPLOYMENT_BASE_IMAGE):$(DEPLOYMENT_BASE_IMAGE_TAG)
-  docker pull $(TOOLCHAIN_BUILDER_IMAGE):$(TOOLCHAIN_BUILDER_IMAGE_TAG)
 
 .PHONY: docker-build-all
 docker-build-all: $(addprefix docker-build-,$(ALL_ARCH)) ## Build docker images for all architectures
