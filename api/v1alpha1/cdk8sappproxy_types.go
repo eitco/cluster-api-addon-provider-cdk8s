@@ -24,7 +24,7 @@ import (
 type GitRepositorySpec struct {
 	// URL is the git repository URL.
 	// If the Repository is private,
-	// Valid options are: 'HTTP', 'HTTPS', and 'git@...' 
+	// Valid options are: 'HTTP', 'HTTPS', and 'git@...'
 	// +kubebuilder:validation:Required
 	URL string `json:"url"`
 

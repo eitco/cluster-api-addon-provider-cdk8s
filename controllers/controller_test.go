@@ -140,10 +140,10 @@ var _ = Describe("Testing Cdk8sAppproxy Reconcile", func() {
 			patch := client.MergeFrom(cluster.DeepCopy())
 			// conditions.MarkTrue(cluster, clusterv1.ControlPlaneInitializedCondition)
 			conditions.Set(cluster, metav1.Condition{
-        Type: clusterv1.ClusterControlPlaneInitializedCondition,
-				Status: metav1.ConditionTrue,
-				Reason: "Successful",
-			  Message: "Cdk8sAppProxy is ready",
+				Type:    clusterv1.ClusterControlPlaneInitializedCondition,
+				Status:  metav1.ConditionTrue,
+				Reason:  "Successful",
+				Message: "Cdk8sAppProxy is ready",
 			})
 			err = k8sClient.Status().Patch(ctx, cluster, patch)
 			Expect(err).ToNot(HaveOccurred())

@@ -24,7 +24,7 @@ type authType string
 const (
 	// authTypeUnknown indicates we can't determine the auth type from the URL.
 	authTypeUnknown authType = "unknown"
-  // authTypeSSH indicates the URL is for SSH authentication.
+	// authTypeSSH indicates the URL is for SSH authentication.
 	authTypeSSH authType = "ssh"
 	// authTypeHTTP indicates the URL is for HTTP/S authentication.
 	authTypeHTTP authType = "http"
@@ -62,10 +62,10 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, 
 	}
 
 	_, err = git.PlainClone(directory, false, &git.CloneOptions{
-		URL:   repoURL,
-		Auth:  auth,
+		URL:           repoURL,
+		Auth:          auth,
 		ReferenceName: plumbing.ReferenceName(branch),
-		Depth: 1,
+		Depth:         1,
 	})
 	if err != nil {
 		logger.Error(err, "Failed to clone repoURL", "repoURL", repoURL)
@@ -123,7 +123,6 @@ func (g *GitImplementer) CheckAccess(repoURL string, secretRef []byte, logger lo
 	})
 
 	if err == nil {
-		logger.Info("Repository is publicly accessible")
 		accessible = true
 		requiresAuth = false
 
@@ -145,7 +144,6 @@ func (g *GitImplementer) CheckAccess(repoURL string, secretRef []byte, logger lo
 	})
 
 	if err == nil {
-		logger.Info("Repository is privatly accessible")
 		accessible = true
 		requiresAuth = true
 
@@ -173,12 +171,12 @@ func getAuth(repoURL string, secretRef []byte, logger logr.Logger) (auth transpo
 	switch urlType {
 	case authTypeHTTP:
 		logger.Info("Using HTTP Basic Auth (PAT) for URL", "url", repoURL)
-    auth = &http.BasicAuth{
+		auth = &http.BasicAuth{
 			Username: "oauth2",
 			Password: string(secretRef),
 		}
 
-    return auth, err
+		return auth, err
 	case authTypeSSH:
 		logger.Info("Using SSH Key Auth for URL", "url", repoURL)
 		auth, err = ssh.NewPublicKeys("git", secretRef, "")
@@ -188,9 +186,9 @@ func getAuth(repoURL string, secretRef []byte, logger logr.Logger) (auth transpo
 			return auth, err
 		}
 	case authTypeUnknown:
-	  logger.Info("unknown type")
+		logger.Info("unknown type")
 
-	  fallthrough
+		fallthrough
 	default:
 		logger.Error(err, "unknown or unsupported URL scheme for auth")
 
@@ -200,11 +198,11 @@ func getAuth(repoURL string, secretRef []byte, logger logr.Logger) (auth transpo
 	return auth, err
 }
 
-func getURLType(repoURL string) authType{
-  if strings.HasPrefix(repoURL, "http://") || strings.HasPrefix(repoURL, "https://") {
+func getURLType(repoURL string) authType {
+	if strings.HasPrefix(repoURL, "http://") || strings.HasPrefix(repoURL, "https://") {
 		return authTypeHTTP
 	}
-	
+
 	// Covers ssh://user@host/repo.git
 	if strings.HasPrefix(repoURL, "ssh://") {
 		return authTypeSSH
@@ -215,7 +213,7 @@ func getURLType(repoURL string) authType{
 		return authTypeSSH
 	}
 
-  return authTypeUnknown
+	return authTypeUnknown
 }
 
 // localHash retrieves the HEAD commit hash from a local repository.
