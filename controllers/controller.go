@@ -100,6 +100,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	secretKey := cdk8sAppProxy.Spec.GitRepository.SecretKey
 	secretName := cdk8sAppProxy.Spec.GitRepository.SecretRef
 
+	defer os.RemoveAll(directory)
+
 	var (
 		secretRef []byte
 		ok        bool
@@ -140,64 +142,70 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		return ctrl.Result{}, err
 	}
 
-	if _, err := os.Stat(directory); os.IsNotExist(err) {
-		// Proceed with cloning knowing wether to use authentication
-		// Controlflow first tries no authentication and then provides a secretRef
-		if !requiredAuth {
-			secretRef = nil
-		}
+	if !requiredAuth {
+		secretRef = nil
+	}
 
-		err = gitImpl.Clone(repoURL, secretRef, branch, directory, logger)
-		if err != nil {
-			logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
-			conditions.Set(cdk8sAppProxy, metav1.Condition{
-				Type: clusterv1.AvailableCondition,
-				Status: metav1.ConditionFalse,
-				Reason: "Failed",
-				Message: "Failed to clone Git Repository",
-			})
-
-			return ctrl.Result{}, err
-		}
-
-		parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
-		if err != nil {
-			logger.Error(err, "failed to synthesize resources")
-			conditions.Set(cdk8sAppProxy, metav1.Condition{
-				Type: clusterv1.AvailableCondition,
-				Status: metav1.ConditionFalse,
-				Reason: "Failed",
-				Message: "Failed to synth cdk8s code",
-			})
-
-			return ctrl.Result{}, err
-		}
-
-		err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
-		if err != nil {
-			logger.Error(err, "failed to apply resources")
-	    conditions.Set(cdk8sAppProxy, metav1.Condition{
-				Type: clusterv1.AvailableCondition,
-				Status: metav1.ConditionFalse,
-				Reason: "Failed",
-				Message: "Failed to apply resources",
-			})
-
-			return ctrl.Result{}, err
-		}
-
+	err = gitImpl.Clone(repoURL, secretRef, branch, directory, logger)
+	if err != nil {
+		logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
 		conditions.Set(cdk8sAppProxy, metav1.Condition{
-      Type: clusterv1.ReadyCondition,
-			Status: metav1.ConditionTrue,
-			Reason: "Successful",
-			Message: "Cdk8sAppProxy is ready",
+			Type:    clusterv1.AvailableCondition,
+			Status:  metav1.ConditionFalse,
+			Reason:  "Failed",
+			Message: "Failed to clone Git Repository",
 		})
 
-		if err = r.Status().Update(ctx, cdk8sAppProxy); err != nil {
-			logger.Error(err, "failed to update cdk8sAppProxy status")
+		return ctrl.Result{}, err
+	}
 
-			return ctrl.Result{}, err
-		}
+	parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
+	if err != nil {
+		logger.Error(err, "failed to synthesize resources")
+		conditions.Set(cdk8sAppProxy, metav1.Condition{
+			Type:    clusterv1.AvailableCondition,
+			Status:  metav1.ConditionFalse,
+			Reason:  "Failed",
+			Message: "Failed to synth cdk8s code",
+		})
+
+		return ctrl.Result{}, err
+	}
+
+	err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
+	if err != nil {
+		logger.Error(err, "failed to apply resources")
+		conditions.Set(cdk8sAppProxy, metav1.Condition{
+			Type:    clusterv1.ReadyCondition,
+			Status:  metav1.ConditionFalse,
+			Reason:  "Failed",
+			Message: "Failed to apply resources",
+		})
+
+		return ctrl.Result{}, err
+	}
+
+	missingResource, err := resourcerImpl.Check(ctx, cdk8sAppProxy, parsedResources, logger)
+	if err != nil {
+		logger.Error(err, "failed to check for resource existence")
+
+		return ctrl.Result{}, err
+	}
+
+	if !missingResource {
+		// !missingResource = true, so the resources are NOT missing. We should switch the logic..
+		conditions.Set(cdk8sAppProxy, metav1.Condition{
+			Type:    clusterv1.ReadyCondition,
+			Status:  metav1.ConditionTrue,
+			Reason:  "Successful",
+			Message: "Cdk8sAppProxy is ready",
+		})
+	}
+
+	if err = r.Status().Update(ctx, cdk8sAppProxy); err != nil {
+		logger.Error(err, "failed to update cdk8sAppProxy status")
+
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, err

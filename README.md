@@ -28,15 +28,39 @@ spec:
       # environment: development
 ```
 
-If you want to use a public or private repository for your deployments, you can find some guidance [here](./docs/Private-Repositories.md)
+If you want to use a public or private repository for your deployments, you can find some guidance [here](./docs/private-repositories.md)
 
 ### Cdk8sAppProxySpec Fields
+```
+// GitRepositorySpec defines the desired state of a Git repository source.
+type GitRepositorySpec struct {
+	// URL is the git repository URL.
+	// If the Repository is private,
+	// Valid options are: 'HTTP', 'HTTPS', and 'git@...' 
+	// +kubebuilder:validation:Required
+	URL string `json:"url"`
 
-- **gitRepository**: (Optional) Specifies the Git repository for the cdk8s application. `gitRepository` must be specified.
-    - **url**: (Required) The Git repository URL.
-    - **reference**: (Required) The Git reference (branch, tag, or commit) to check out.
-    - **path**: (Required) The path within the repository where the cdk8s application is located. Defaults to the root.
-- **clusterSelector**: (Required) A `metav1.LabelSelector` that specifies which workload clusters the cdk8s application should be deployed to. The controller will watch for clusters matching this selector.
+	// Reference (optional) defines the branch, tag or hash which CAAPC
+	// will pull from. If left empty, defaults to 'main'.
+	// +kubebuilder:validation:optional
+	Reference string `json:"reference,omitempty"`
+
+	// Path (optional) is the path within the repository where the cdk8s application is located.
+	// Defaults to the root of the repository.
+	// +kubebuilder:validation:optional
+	Path string `json:"path,omitempty"`
+
+	// SecretRef references to a secret with the
+	// needed token, used to pull from a private repository.
+	// Valid options are SSHKeys and PAT Tokens.
+	// +kubebuilder:validation:optional
+	SecretRef string `json:"secretRef,omitempty"`
+
+	// SecretKey is the key within the SecretRef secret.
+	// +kubebuilder:validation:optional
+	SecretKey string `json:"secretKey,omitempty"`
+}
+```
 
 ## Examples
 
