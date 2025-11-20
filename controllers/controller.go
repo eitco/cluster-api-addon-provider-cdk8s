@@ -193,7 +193,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	}
 
 	if !missingResource {
-		// !missingResource = true, so the resources are NOT missing. We should switch the logic..
 		conditions.Set(cdk8sAppProxy, metav1.Condition{
 			Type:    clusterv1.ReadyCondition,
 			Status:  metav1.ConditionTrue,

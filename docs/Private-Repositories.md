@@ -1,19 +1,17 @@
 # Using CAAPC with a private Repository
 
 Disclaimer:
-This guide assumes, that you have a running management CAPI cluster.
-Depending on your labeled cluster, you might want to use the vcluster provider, to install a workload cluster ontop of your management cluster.
+Depending of your kind of cluster (Cluster-API managed, or not), you might want to use the vcluster provider, to run a cluster-api compatible kubernetes cluster on top of your kubernetes cluster.
 
 ---
 The private Repository - which we are going to use - is based on [this](https://github.com/PatrickLaabs/cdk8s-sample-deployment-public) public Repository. 
-You might want to set up you own one.
+You might want to set up you own.
 
 ### Set up a github-token
+Create a kubernetes secret, which holds your ssh private key, to connect to your private repository.
+We suggest using a secret store, like openBao - or such - with the external-secret-operator.
 
-Create a kubernetes secret, which holds your ssh private key, to connect to your private repository.We suggest using a secret store, like openBao - or such - with the external-secret-operator, to makelive easier.
-
-This secret should be formated like this:
-
+The secret - that holds your token - should be formated in a form like this:
 ```
 ---
 apiVersion: v1
@@ -22,7 +20,7 @@ data:
 kind: Secret
 metadata:
   name: github-token
-  namespace: caapc-system
+  namespace: default
 type: Opaque
 
 ```
@@ -41,7 +39,7 @@ spec:
     reference: "main"
     path: "."
     secretRef: github-token
-    secretKey: api-token
+    secretKey: token
   clusterSelector: {}
 
 ```
