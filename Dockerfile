@@ -67,6 +67,7 @@ RUN --mount=type=secret,id=netrc,required=false,target=/root/.netrc \
     go build .
 
 # Do not force rebuild of up-to-date packages (do not use -a) and use the compiler cache folder
+# hadolint ignore=SC2086
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} \
@@ -77,7 +78,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM alpine:3.22.2 AS go_runtime_builder
 ARG ARCH
 
-RUN apk add --no-cache curl tar xz
+RUN apk add --no-cache curl=8.14.1-r2 tar=1.35-r3 xz=5.8.1-r0
 RUN curl -fsSL -o go1.25.3.linux-${ARCH}.tar.gz https://go.dev/dl/go1.25.3.linux-${ARCH}.tar.gz \
     && tar -C /usr/local -xzf go1.25.3.linux-${ARCH}.tar.gz \
     && rm go1.25.3.linux-${ARCH}.tar.gz 
