@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:0.4
 
 # Copyright 2023 The Kubernetes Authors.
 #
@@ -25,10 +25,13 @@ ARG package=.
 ARG ldflags
 
 # Build step only to fetch the ssh_known_hosts
-FROM alpine:3.22.2 AS sshbuilder
+FROM ${deployment_base_image}:${deployment_base_image_tag} AS sshbuilder
+ARG openssh_version
+ARG openssh_client_version
+
 WORKDIR /ssh
 
-RUN apk add --no-cache openssh=10.0_p1-r9 openssh-client=10.0_p1-r9
+RUN apk add --no-cache openssh=${openssh_version} openssh-client=${openssh_client_version}
 
 COPY ./hack/update-ssh-known-hosts.sh ./
 
@@ -75,34 +78,38 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     -o manager ${package}
 
 # Go Runtime Builder
-FROM alpine:3.22.2 AS go_runtime_builder
+FROM ${deployment_base_image}:${deployment_base_image_tag} AS go_runtime_builder
 ARG ARCH
+ARG go_version
+ARG curl_version
+ARG xz_version
+ARG tar_version
 
-RUN apk add --no-cache curl=8.14.1-r2 tar=1.35-r3 xz=5.8.1-r0
-RUN curl -fsSL -o go1.25.3.linux-${ARCH}.tar.gz https://go.dev/dl/go1.25.3.linux-${ARCH}.tar.gz \
-    && tar -C /usr/local -xzf go1.25.3.linux-${ARCH}.tar.gz \
-    && rm go1.25.3.linux-${ARCH}.tar.gz 
+RUN apk add --no-cache curl=${curl_version} tar=${tar_version} xz=${xz_version}
+RUN curl -fsSL -o go${go_version}.linux-${ARCH}.tar.gz https://go.dev/dl/go${go_version}.linux-${ARCH}.tar.gz \
+    && tar -C /usr/local -xzf go${go_version}.linux-${ARCH}.tar.gz \
+    && rm go${go_version}.linux-${ARCH}.tar.gz 
 
 # NODE Runtime Builder
-FROM alpine:3.22.2 as node_runtime_builder
+# FROM alpine:3.22.2 as node_runtime_builder
 
-RUN apk add --no-cache nodejs=22.16.0-r2 npm=11.3.0-r1  \
-    && npm install -g cdk8s-cli@2.202.3 \
-    && npm cache clean --force \
-    && rm -rf /root/.npm \
-    && rm -rf /var/cache/apk/*
+# RUN apk add --no-cache nodejs=22.16.0-r2 npm=11.4.2-r0  \
+#     && npm install -g cdk8s-cli@2.202.3 \
+#     && npm cache clean --force \
+#     && rm -rf /root/.npm \
+#     && rm -rf /var/cache/apk/*
 
 # Production image
 FROM ${deployment_base_image}:${deployment_base_image_tag}
-
-# Build architecture - redeclare for this stage
 ARG ARCH
+ARG nodejs_version
+ARG npm_version
+ARG cdk8s_version
 
 WORKDIR /
 
-# RUN apk add --no-cache ca-certificates=20250911-r0 nodejs=22.16.0-r2 npm=11.3.0-r1 \
-RUN apk add --no-cache nodejs=22.16.0-r2 npm=11.3.0-r1 \
-    && npm install -g cdk8s-cli@2.202.3 \
+RUN apk add --no-cache nodejs=${nodejs_version} npm=${npm_version} \
+    && npm install -g cdk8s-cli@${cdk8s_version} \
     && npm cache clean --force \
     && rm -rf /root/.npm /tmp/* /var/cache/apk/*
 

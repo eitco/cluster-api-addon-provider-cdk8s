@@ -23,10 +23,10 @@ SHELL:=/usr/bin/env bash
 #
 # Go.
 #
-GO_VERSION ?= $(shell cat go.mod | grep "toolchain" | { read _ v; echo "$${v#go}"; } | grep "[0-9]" || cat go.mod | grep "go " | head -1 | awk '{print $$2}')
-# GO_BASE_CONTAINER ?= docker.io/library/golang
-# GO_CONTAINER_IMAGE ?= $(GO_BASE_CONTAINER):$(GO_VERSION)
-GO_CONTAINER_IMAGE ?= golang:1.25.3
+# GO_VERSION ?= $(shell cat go.mod | grep "toolchain" | { read _ v; echo "$${v#go}"; } | grep "[0-9]" || cat go.mod | grep "go " | head -1 | awk '{print $$2}')
+GO_VERSION ?= 1.25.3
+GO_BASE_CONTAINER ?= docker.io/library/golang
+GO_CONTAINER_IMAGE ?= $(GO_BASE_CONTAINER):$(GO_VERSION)
 
 # Use GOPROXY environment variable if set
 GOPROXY := $(shell go env GOPROXY)
@@ -46,11 +46,22 @@ export GO111MODULE=on
 
 DOCKERFILE_CONTAINER_IMAGE ?= docker.io/docker/dockerfile:1.4
 # In order to use a distroless image, we need to identify how to solve the issue with NPM.
-# DEPLOYMENT_BASE_IMAGE ?= gcr.io/distroless/static
-# DEPLOYMENT_BASE_IMAGE_TAG ?= nonroot-${ARCH}
+# DEPLOYMENT_BASE_IMAGE ?= gcr.io/distroless/nodejs22-debian12
+# DEPLOYMENT_BASE_IMAGE_TAG ?= debug-nonroot-${ARCH}
 DEPLOYMENT_BASE_IMAGE ?= alpine
 DEPLOYMENT_BASE_IMAGE_TAG ?= 3.22.2
 BUILD_CONTAINER_ADDITIONAL_ARGS ?=
+
+# APK Version for Dockerbuilds
+
+CURL_VERSION ?= 8.14.1-r2
+TAR_VERSION ?= 1.35-r3
+XZ_VERSION ?= 5.8.1-r0
+NODEJS_VERSION ?= 22.16.0-r2
+NPM_VERSION ?= 11.4.2-r0
+CDK8S_VERSION ?= 2.202.3
+OPENSSH_VERSION ?= 10.0_p1-r9
+OPENSSH_CLIENT_VERSION ?= $(OPENSSH_VERSION)
 
 #
 # Kubebuilder.
@@ -224,9 +235,9 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
-# TAG ?= dev
+TAG ?= dev
 # Next release v1.0.0-alpha.12
-TAG ?= v1.0.0-alpha.12
+# TAG ?= v1.0.0-alpha.12
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 ppc64le
 
@@ -413,7 +424,7 @@ docker-build-%:
 
 .PHONY: docker-build
 docker-build: docker-pull-prerequisites ## Build the docker image for core controller manager
-	DOCKER_BUILDKIT=1 docker build $(BUILD_CONTAINER_ADDITIONAL_ARGS) --platform=linux/$(ARCH) --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg deployment_base_image=$(DEPLOYMENT_BASE_IMAGE) --build-arg deployment_base_image_tag=$(DEPLOYMENT_BASE_IMAGE_TAG) --build-arg goproxy=$(GOPROXY) --build-arg goprivate=$(GOPRIVATE) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
+	DOCKER_BUILDKIT=1 docker build $(BUILD_CONTAINER_ADDITIONAL_ARGS) --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg deployment_base_image=$(DEPLOYMENT_BASE_IMAGE) --build-arg deployment_base_image_tag=$(DEPLOYMENT_BASE_IMAGE_TAG) --build-arg goproxy=$(GOPROXY) --build-arg goprivate=$(GOPRIVATE) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . --build-arg go_version=$(GO_VERSION) --build-arg curl_version=$(CURL_VERSION) --build-arg xz_version=$(XZ_VERSION) --build-arg tar_version=$(TAR_VERSION) --build-arg nodejs_version=$(NODEJS_VERSION) --build-arg npm_version=$(NPM_VERSION) --build-arg cdk8s_version=$(CDK8S_VERSION) --build-arg openssh_version=$(OPENSSH_VERSION) --build-arg openssh_client_version=$(OPENSSH_CLIENT_VERSION) -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
 	$(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
 	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml"
 
