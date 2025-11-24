@@ -3,7 +3,7 @@ module github.com/eitco/cluster-api-addon-provider-cdk8s
 go 1.25.3
 
 require (
-	github.com/go-git/go-git/v5 v5.16.3
+	github.com/go-git/go-git/v5 v5.16.4
 	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
