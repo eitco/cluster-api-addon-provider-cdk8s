@@ -51,7 +51,7 @@ const (
 	sshConnectionTimeout                  = 30 * time.Second
 )
 
-func Byf(format string, a ...interface{}) {
+func Byf(format string, a ...any) {
 	By(fmt.Sprintf(format, a...))
 }
 
@@ -243,7 +243,7 @@ type WaitForCdk8sAppProxyReadyInput struct {
 //	Logf("Cdk8sAppProxy %s/%s is now ready, took %v", namespace, name, time.Since(start))
 //}
 
-func WaitForCdk8sAppProxyReady(ctx context.Context, input WaitForCdk8sAppProxyReadyInput, intervals ...interface{}) {
+func WaitForCdk8sAppProxyReady(ctx context.Context, input WaitForCdk8sAppProxyReadyInput, intervals ...any) {
 	start := time.Now()
 	namespace, name := input.Cdk8sAppProxy.GetNamespace(), input.Cdk8sAppProxy.GetName()
 
