@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # tag=v6.0.1
       - name: Calculate go version
         id: vars
-        run: echo "go_version=1.25.3" >> $GITHUB_OUTPUT
+        run: echo "go_version=1.25.5" >> $GITHUB_OUTPUT
       - name: Set up Go
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # tag=v6.1.0
         with:
