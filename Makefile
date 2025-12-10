@@ -24,7 +24,7 @@ SHELL:=/usr/bin/env bash
 # Go.
 #
 # GO_VERSION ?= $(shell cat go.mod | grep "toolchain" | { read _ v; echo "$${v#go}"; } | grep "[0-9]" || cat go.mod | grep "go " | head -1 | awk '{print $$2}')
-GO_VERSION ?= 1.25.3
+GO_VERSION ?= 1.25.5
 GO_BASE_CONTAINER ?= docker.io/library/golang
 GO_CONTAINER_IMAGE ?= $(GO_BASE_CONTAINER):$(GO_VERSION)
 
