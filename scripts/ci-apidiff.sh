@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2020 The Kubernetes Authors.
 #
@@ -18,9 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-REPO_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# resolving repo directory, even through symlinks
+SCRIPT_DIR="$(
+  cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1
+  pwd
+)"
 
-cd "${REPO_ROOT}"
+REPO_ROOT="${SCRIPT_DIR}/.."
+
+cd "${REPO_ROOT}" || exit 1
 
 echo "*** Running go-apidiff ***"
 APIDIFF_OLD_COMMIT="${PULL_BASE_SHA}" make apidiff
