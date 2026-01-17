@@ -198,7 +198,7 @@ func dumpSpecResourcesAndCleanup(ctx context.Context, input cleanupInput) {
 	if input.Cluster == nil {
 		By("Unable to dump workload cluster logs as the cluster is nil")
 	} else if !input.SkipLogCollection {
-		Byf("Dumping logs from the %q workload cluster", input.Cluster.Name)
+	  Byf("Dumping logs from the %q workload cluster", input.Cluster.Name)
 		input.ClusterProxy.CollectWorkloadClusterLogs(ctx, input.Cluster.Namespace, input.Cluster.Name, filepath.Join(input.ArtifactFolder, "clusters", input.Cluster.Name))
 	}
 
@@ -206,15 +206,15 @@ func dumpSpecResourcesAndCleanup(ctx context.Context, input cleanupInput) {
 		return
 	}
 
-	Logf("Deleting all clusters in the %s namespace", input.Namespace.Name)
+	// Logf("Deleting all clusters in the %s namespace", input.Namespace.Name)
 	// While https://github.com/kubernetes-sigs/cluster-api/issues/2955 is addressed in future iterations, there is a chance
 	// that cluster variable is not set even if the cluster exists, so we are calling DeleteAllClustersAndWait
 	// instead of DeleteClusterAndWait
-	deleteTimeoutConfig := "wait-delete-cluster"
-	framework.DeleteAllClustersAndWait(ctx, framework.DeleteAllClustersAndWaitInput{
-		Client:    input.ClusterProxy.GetClient(),
-		Namespace: input.Namespace.Name,
-	}, input.IntervalsGetter(input.SpecName, deleteTimeoutConfig)...)
+	// deleteTimeoutConfig := "wait-delete-cluster"
+	// framework.DeleteAllClustersAndWait(ctx, framework.DeleteAllClustersAndWaitInput{
+	// 	Client:    input.ClusterProxy.GetClient(),
+	// 	Namespace: input.Namespace.Name,
+	// }, input.IntervalsGetter(input.SpecName, deleteTimeoutConfig)...)
 
 	Logf("Deleting namespace used for hosting the %q test spec", input.SpecName)
 	framework.DeleteNamespace(ctx, framework.DeleteNamespaceInput{
