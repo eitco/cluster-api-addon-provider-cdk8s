@@ -90,15 +90,6 @@ RUN curl -fsSL -o go${go_version}.linux-${ARCH}.tar.gz https://go.dev/dl/go${go_
     && tar -C /usr/local -xzf go${go_version}.linux-${ARCH}.tar.gz \
     && rm go${go_version}.linux-${ARCH}.tar.gz 
 
-# NODE Runtime Builder
-# FROM alpine:3.22.2 as node_runtime_builder
-
-# RUN apk add --no-cache nodejs=22.16.0-r2 npm=11.4.2-r0  \
-#     && npm install -g cdk8s-cli@2.202.3 \
-#     && npm cache clean --force \
-#     && rm -rf /root/.npm \
-#     && rm -rf /var/cache/apk/*
-
 # Production image
 FROM ${deployment_base_image}:${deployment_base_image_tag}
 ARG ARCH
@@ -110,8 +101,7 @@ WORKDIR /
 
 RUN apk add --no-cache nodejs=${nodejs_version} npm=${npm_version} \
     && npm install -g cdk8s-cli@${cdk8s_version} \
-    && npm cache clean --force \
-    && rm -rf /root/.npm /tmp/* /var/cache/apk/*
+    && npm cache clean --force
 
 COPY --from=go_runtime_builder /usr/local/go /usr/local/go
 COPY --from=builder /workspace/manager .
