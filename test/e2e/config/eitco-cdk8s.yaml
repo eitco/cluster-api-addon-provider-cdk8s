@@ -133,6 +133,16 @@ providers:
       new: "imagePullPolicy: IfNotPresent"
     - old: "--v=0"
       new: "--v=2"
+  - name: v1.99.99
+    value: "${PWD}/config/default"
+    contract: v1beta2
+    files:
+    - sourcePath: "${PWD}/test/e2e/data/shared/v1beta2-provider/metadata.yaml"
+    replacements:
+    - old: "imagePullPolicy: Always"
+      new: "imagePullPolicy: IfNotPresent"
+    - old: "--v=0"
+      new: "--v=2"
 
 variables:
   # Default variables for the e2e test; those values could be overridden via env variables, thus
