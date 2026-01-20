@@ -100,6 +100,16 @@ func EnsureControlPlaneInitialized(ctx context.Context, input clusterctl.ApplyCu
 	}, input.WaitForControlPlaneIntervals...)
 }
 
+func EnsureVClusterInitialized(ctx context.Context, input clusterctl.ApplyCustomClusterTemplateAndWaitInput, result *clusterctl.ApplyCustomClusterTemplateAndWaitResult) {
+	By("Ensuring VCluster is initialized")
+	// For vcluster, we just wait for the cluster to be ready as VCluster handles its own control plane.
+	// We can use DiscoveryAndWaitForControlPlaneInitialized which is generic enough if the cluster status is updated.
+	result.ControlPlane = framework.DiscoveryAndWaitForControlPlaneInitialized(ctx, framework.DiscoveryAndWaitForControlPlaneInitializedInput{
+		Lister:  input.ClusterProxy.GetClient(),
+		Cluster: result.Cluster,
+	}, input.WaitForControlPlaneIntervals...)
+}
+
 // ToDo: Guess we watch for the wrong namespaces here.
 const (
 	CalicoSystemNamespace    string = "calico-system"
@@ -312,6 +322,12 @@ func createApplyClusterTemplateInput(specName string, changes ...func(*clusterct
 func withClusterProxy(proxy framework.ClusterProxy) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
 	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
 		input.ClusterProxy = proxy
+	}
+}
+
+func withInfrastructureProvider(provider string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ConfigCluster.InfrastructureProvider = provider
 	}
 }
 

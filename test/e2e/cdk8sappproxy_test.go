@@ -116,10 +116,9 @@ var _ = Describe("Workload cluster creation", func() {
 				specName,
 				withNamespace(namespace.Name),
 				withClusterName(clusterName),
-				withControlPlaneMachineCount(1),
-				withWorkerMachineCount(1),
+				withInfrastructureProvider("vcluster"),
 				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
-					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+					WaitForControlPlaneInitialized: EnsureVClusterInitialized,
 				}),
 			), result)
 
