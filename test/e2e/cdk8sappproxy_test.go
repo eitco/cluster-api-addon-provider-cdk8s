@@ -27,14 +27,14 @@ import (
 	"time"
 
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
-	"sigs.k8s.io/cluster-api/test/framework"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
+	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/cluster-api/util"
 )
@@ -130,9 +130,9 @@ var _ = Describe("Workload cluster creation", func() {
 				},
 				Spec: addonsv1alpha1.Cdk8sAppProxySpec{
 					GitRepository: &addonsv1alpha1.GitRepositorySpec{
-						URL:                   "https://github.com/PatrickLaabs/cdk8s-sample-deployment",
-						Reference:             "main",
-						Path:                  ".",
+						URL:       "https://github.com/PatrickLaabs/cdk8s-sample-deployment",
+						Reference: "main",
+						Path:      ".",
 						// ReferencePollInterval: &metav1.Duration{Duration: 30 * time.Second},
 					},
 					ClusterSelector: metav1.LabelSelector{
@@ -198,7 +198,7 @@ func dumpSpecResourcesAndCleanup(ctx context.Context, input cleanupInput) {
 	if input.Cluster == nil {
 		By("Unable to dump workload cluster logs as the cluster is nil")
 	} else if !input.SkipLogCollection {
-	  Byf("Dumping logs from the %q workload cluster", input.Cluster.Name)
+		Byf("Dumping logs from the %q workload cluster", input.Cluster.Name)
 		input.ClusterProxy.CollectWorkloadClusterLogs(ctx, input.Cluster.Namespace, input.Cluster.Name, filepath.Join(input.ArtifactFolder, "clusters", input.Cluster.Name))
 	}
 
@@ -210,11 +210,13 @@ func dumpSpecResourcesAndCleanup(ctx context.Context, input cleanupInput) {
 	// While https://github.com/kubernetes-sigs/cluster-api/issues/2955 is addressed in future iterations, there is a chance
 	// that cluster variable is not set even if the cluster exists, so we are calling DeleteAllClustersAndWait
 	// instead of DeleteClusterAndWait
-	// deleteTimeoutConfig := "wait-delete-cluster"
-	// framework.DeleteAllClustersAndWait(ctx, framework.DeleteAllClustersAndWaitInput{
-	// 	Client:    input.ClusterProxy.GetClient(),
-	// 	Namespace: input.Namespace.Name,
-	// }, input.IntervalsGetter(input.SpecName, deleteTimeoutConfig)...)
+	deleteTimeoutConfig := "wait-delete-cluster"
+	framework.DeleteAllClustersAndWait(ctx, framework.DeleteAllClustersAndWaitInput{
+		ClusterProxy:         input.ClusterProxy,
+		Namespace:            input.Namespace.Name,
+		ClusterctlConfigPath: clusterctlConfigPath,
+		ArtifactFolder:       input.ArtifactFolder,
+	}, input.IntervalsGetter(input.SpecName, deleteTimeoutConfig)...)
 
 	Logf("Deleting namespace used for hosting the %q test spec", input.SpecName)
 	framework.DeleteNamespace(ctx, framework.DeleteNamespaceInput{
