@@ -116,7 +116,7 @@ var _ = Describe("Workload cluster creation", func() {
 				specName,
 				withNamespace(namespace.Name),
 				withClusterName(clusterName),
-				withInfrastructureProvider("vcluster"),
+				withInfrastructureProvider("docker"), // ToDo: Removing hard-coded defnition here, in case we want to switch easier.
 				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
 					WaitForControlPlaneInitialized: EnsureVClusterInitialized,
 				}),
@@ -129,10 +129,9 @@ var _ = Describe("Workload cluster creation", func() {
 				},
 				Spec: addonsv1alpha1.Cdk8sAppProxySpec{
 					GitRepository: &addonsv1alpha1.GitRepositorySpec{
-						URL:       "https://github.com/PatrickLaabs/cdk8s-sample-deployment",
+						URL:       "https://github.com/PatrickLaabs/cdk8s-sample-deployment-public",
 						Reference: "main",
-						Path:      ".",
-						// ReferencePollInterval: &metav1.Duration{Duration: 30 * time.Second},
+						Path:      "deployments",
 					},
 					ClusterSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{},
