@@ -130,7 +130,7 @@ get_go_version = $(shell go list -f "{{.Version}}" -m $1)
 # curl retries
 CURL_RETRIES=3
 
-KUSTOMIZE_VER := v5.7.1
+KUSTOMIZE_VER := v5.7.0
 KUSTOMIZE_BIN := kustomize
 KUSTOMIZE := $(abspath $(TOOLS_BIN_DIR)/$(KUSTOMIZE_BIN)-$(KUSTOMIZE_VER))
 KUSTOMIZE_PKG := sigs.k8s.io/kustomize/kustomize/v5
