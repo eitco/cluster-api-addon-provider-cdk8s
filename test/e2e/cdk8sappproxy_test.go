@@ -118,7 +118,7 @@ var _ = Describe("Workload cluster creation", func() {
 				withClusterName(clusterName),
 				withInfrastructureProvider("docker"), // ToDo: Removing hard-coded defnition here, in case we want to switch easier.
 				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
-					WaitForControlPlaneInitialized: EnsureVClusterInitialized,
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized, 
 				}),
 			), result)
 
