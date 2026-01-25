@@ -49,6 +49,11 @@ type Cdk8sAppProxyGeneratorSpec struct {
 	// Template defines the Cdk8sAppProxy to be generated for each PR.
 	Template Cdk8sAppProxyTemplate `json:"template"`
 
+	// Path (optional) is the path within the repository where the cdk8s application is located.
+	// This overrides any path set in the Source.
+	// +optional
+	Path string `json:"path,omitempty"`
+
 	// PollInterval defines how often the generator should poll the Git provider for open PRs.
 	// Defaults to 5 minutes.
 	// +optional

@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -125,8 +126,16 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Update last polled time.
-	generator.Status.LastPolledTime = &metav1.Time{Time: time.Now()}
-	if err := r.Status().Update(ctx, generator); err != nil {
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest := &addonsv1alpha1.Cdk8sAppProxyGenerator{}
+		if err := r.Get(ctx, req.NamespacedName, latest); err != nil {
+			return err
+		}
+		latest.Status.LastPolledTime = &metav1.Time{Time: time.Now()}
+
+		return r.Status().Update(ctx, latest)
+	})
+	if err != nil {
 		logger.Error(err, "failed to update status")
 
 		return ctrl.Result{}, err
@@ -191,6 +200,9 @@ func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addons
 	if generator.Spec.Source.Path != "" {
 		proxy.Spec.GitRepository.Path = generator.Spec.Source.Path
 	}
+	if generator.Spec.Path != "" {
+		proxy.Spec.GitRepository.Path = generator.Spec.Path
+	}
 
 	// Create or Update the Cdk8sAppProxy.
 	existingProxy := &addonsv1alpha1.Cdk8sAppProxy{}
@@ -205,7 +217,7 @@ func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addons
 		return err
 	}
 
-	logger.Info("Updating Cdk8sAppProxy for PR", "proxyName", proxyName)
+	logger.Info("Updating Cdk8sAppProxy for PR", "proxyName", proxyName, "ref", proxy.Spec.GitRepository.Reference, "path", proxy.Spec.GitRepository.Path)
 	existingProxy.Spec = proxy.Spec
 	existingProxy.Labels = proxy.Labels
 	existingProxy.Annotations = proxy.Annotations

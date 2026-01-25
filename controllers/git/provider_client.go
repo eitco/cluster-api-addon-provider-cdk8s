@@ -58,6 +58,8 @@ func (c *GitHubClient) ListPullRequests(ctx context.Context, repoURL string, sec
 	}
 
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=open", owner, repo)
+	logger.Info("Querying GitHub API", "url", apiURL, "tokenPresent", len(secretRef) > 0)
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create request")

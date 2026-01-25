@@ -53,6 +53,11 @@ spec:
                       type: string
                   type: object
                 type: array
+              path:
+                description: |-
+                  Path (optional) is the path within the repository where the cdk8s application is located.
+                  This overrides any path set in the Source.
+                type: string
               pollInterval:
                 description: |-
                   PollInterval defines how often the generator should poll the Git provider for open PRs.

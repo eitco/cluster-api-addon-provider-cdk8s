@@ -128,7 +128,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		}
 	}
 
-	// Check access before (interface)Cloning
+	// Check access before Cloning
 	_, requiredAuth, err := gitImpl.CheckAccess(repoURL, secretRef, logger)
 	if err != nil {
 		logger.Error(err, "Failed to check repository access")
@@ -146,6 +146,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		secretRef = nil
 	}
 
+	logger.Info("Starting to clone git repository", "repoURL", repoURL, "branch", branch, "directory", directory)
 	err = gitImpl.Clone(repoURL, secretRef, branch, directory, logger)
 	if err != nil {
 		logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
@@ -158,7 +159,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 		return ctrl.Result{}, err
 	}
+	logger.Info("Successfully cloned git repository")
 
+	logger.Info("Starting to synthesize resources", "directory", directory)
 	parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
 	if err != nil {
 		logger.Error(err, "failed to synthesize resources")
@@ -171,6 +174,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 		return ctrl.Result{}, err
 	}
+	logger.Info("Successfully synthesized resources", "count", len(parsedResources))
 
 	err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
 	if err != nil {
@@ -206,6 +210,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 		return ctrl.Result{}, err
 	}
+
+	logger.Info("Reconciliation finished successfully")
 
 	return ctrl.Result{}, err
 }
