@@ -20,29 +20,24 @@ ARG builder_image
 ARG deployment_base_image
 ARG deployment_base_image_tag
 ARG goprivate
-ARG ARCH
-ARG package=.
-ARG ldflags
 
 # Build step only to fetch the ssh_known_hosts
-FROM ${deployment_base_image}:${deployment_base_image_tag} AS sshbuilder
-ARG openssh_version
-ARG openssh_client_version
+FROM --platform=$TARGETPLATFORM ${deployment_base_image}:${deployment_base_image_tag} AS sshbuilder
+ARG TARGETPLATFORM
 
 WORKDIR /ssh
 
-RUN apk add --no-cache openssh=${openssh_version} openssh-client=${openssh_client_version}
+RUN apk add --no-cache openssh=10.2_p1-r0 openssh-client=10.2_p1-r0
 
 COPY ./hack/update-ssh-known-hosts.sh ./
 
 # Known Hosts
 RUN ./update-ssh-known-hosts.sh
 
-# Ignore Hadolint rule "Always tag the version of an image explicitly."
-# It's an invalid finding since the image is explicitly set in the Makefile.
-# https://github.com/hadolint/hadolint/wiki/DL3006
-# hadolint ignore=DL3006
-FROM ${builder_image} AS builder
+FROM --platform=$BUILDPLATFORM ${builder_image} AS builder
+ARG TARGETPLATFORM
+ARG TARGETARCH
+
 WORKDIR /workspace
 
 # Run this with docker build --build-arg goproxy=$(go env GOPROXY) to override the goproxy
@@ -69,41 +64,28 @@ RUN --mount=type=secret,id=netrc,required=false,target=/root/.netrc \
     --mount=type=cache,target=/go/pkg/mod \
     go build .
 
+# Build
+ARG package=.
+ARG ldflags
+
 # Do not force rebuild of up-to-date packages (do not use -a) and use the compiler cache folder
 # hadolint ignore=SC2086
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags "${ldflags} -extldflags '-static'" \
     -o manager ${package}
 
-# Go Runtime Builder
-FROM ${deployment_base_image}:${deployment_base_image_tag} AS go_runtime_builder
-ARG ARCH
-ARG go_version
-ARG curl_version
-ARG xz_version
-ARG tar_version
-
-RUN apk add --no-cache curl=${curl_version} tar=${tar_version} xz=${xz_version}
-RUN curl -fsSL -o go${go_version}.linux-${ARCH}.tar.gz https://go.dev/dl/go${go_version}.linux-${ARCH}.tar.gz \
-    && tar -C /usr/local -xzf go${go_version}.linux-${ARCH}.tar.gz \
-    && rm go${go_version}.linux-${ARCH}.tar.gz 
-
 # Production image
-FROM ${deployment_base_image}:${deployment_base_image_tag}
-ARG ARCH
-ARG nodejs_version
-ARG npm_version
-ARG cdk8s_version
+FROM --platform=$TARGETPLATFORM ${deployment_base_image}:${deployment_base_image_tag}
+ARG TARGETPLATFORM
 
 WORKDIR /
 
-RUN apk add --no-cache nodejs=${nodejs_version} npm=${npm_version} \
-    && npm install -g cdk8s-cli@${cdk8s_version} \
+RUN apk add --no-cache nodejs=24.13.0-r1 npm=11.6.3-r0 go=1.25.6-r0 \
+    && npm install -g cdk8s-cli@2.203.18 \
     && npm cache clean --force
 
-COPY --from=go_runtime_builder /usr/local/go /usr/local/go
 COPY --from=builder /workspace/manager .
 COPY --from=sshbuilder /ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts
 
@@ -111,8 +93,5 @@ COPY --from=sshbuilder /ssh/ssh_known_hosts /etc/ssh/ssh_known_hosts
 ENV PATH=$PATH:/usr/local/go/bin:/usr/local/bin
 ENV GOROOT=/usr/local/go
 
-# Create non-root user
-RUN adduser -u 65532 -D -h /home/nonroot -s /bin/sh nonroot
-   
 USER 65532
 ENTRYPOINT ["/manager"]
