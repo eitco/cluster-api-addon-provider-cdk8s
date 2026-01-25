@@ -17,6 +17,6 @@ jobs:
     - name: Setup go
       uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # tag=v6.2.0
       with:
-        go-version: 1.25.5
+        go-version: 1.25.6
     - name: Run verify container script
       run: make verify-container-images

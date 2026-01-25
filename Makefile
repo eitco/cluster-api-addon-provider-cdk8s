@@ -24,7 +24,7 @@ SHELL:=/usr/bin/env bash
 # Go.
 #
 # GO_VERSION ?= $(shell cat go.mod | grep "toolchain" | { read _ v; echo "$${v#go}"; } | grep "[0-9]" || cat go.mod | grep "go " | head -1 | awk '{print $$2}')
-GO_VERSION ?= 1.25.5
+GO_VERSION ?= 1.25.6
 GO_BASE_CONTAINER ?= docker.io/library/golang
 GO_CONTAINER_IMAGE ?= $(GO_BASE_CONTAINER):$(GO_VERSION)
 
@@ -43,30 +43,20 @@ export GOPRIVATE
 export GO111MODULE=on
 
 # Base docker images
-
 DOCKERFILE_CONTAINER_IMAGE ?= docker.io/docker/dockerfile:1.4
-# In order to use a distroless image, we need to identify how to solve the issue with NPM.
-# DEPLOYMENT_BASE_IMAGE ?= gcr.io/distroless/nodejs22-debian12
-# DEPLOYMENT_BASE_IMAGE_TAG ?= debug-nonroot-${ARCH}
 DEPLOYMENT_BASE_IMAGE ?= alpine
 DEPLOYMENT_BASE_IMAGE_TAG ?= 3.23.2
 BUILD_CONTAINER_ADDITIONAL_ARGS ?=
 
-# APK Version for Dockerbuilds
-
-CURL_VERSION ?= 8.17.0-r1
-TAR_VERSION ?= 1.35-r4
-XZ_VERSION ?= 5.8.2-r0
-NODEJS_VERSION ?= 24.13.0-r0
+# APK Version for Docker builds
+NODEJS_VERSION ?= 24.13.0-r1
 NPM_VERSION ?= 11.6.3-r0
 CDK8S_VERSION ?= 2.203.18
-OPENSSH_VERSION ?= 10.2_p1-r0
-OPENSSH_CLIENT_VERSION ?= $(OPENSSH_VERSION)
 
 #
 # Kubebuilder.
 #
-export KUBEBUILDER_ENVTEST_KUBERNETES_VERSION ?= 1.32.0
+export KUBEBUILDER_ENVTEST_KUBERNETES_VERSION ?= 1.34.0
 export KUBEBUILDER_CONTROLPLANE_START_TIMEOUT ?= 60s
 export KUBEBUILDER_CONTROLPLANE_STOP_TIMEOUT ?= 60s
 
@@ -236,8 +226,7 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
 TAG ?= dev
-# Next release v1.0.0-alpha.12
-# TAG ?= v1.0.0-alpha.12
+#TAG ?= v1.0.0-beta.3-8
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 ppc64le
 
@@ -264,6 +253,9 @@ all: test manager
 
 help:  # Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[0-9A-Za-z_-]+:.*?##/ { printf "  \033[36m%-45s\033[0m %s\n", $$1, $$2 } /^\$$\([0-9A-Za-z_-]+\):.*?##/ { gsub("_","-", $$1); printf "  \033[36m%-45s\033[0m %s\n", tolower(substr($$1, 3, length($$1)-7)), $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+go-version: ## Print the go version we use to compile our binaries and images
+	@echo $(GO_VERSION)
 
 ## --------------------------------------
 ## Go Built-ins
@@ -412,9 +404,9 @@ manager: ## Build the manager binary into the ./bin folder
 
 .PHONY: docker-pull-prerequisites
 docker-pull-prerequisites:
-	docker pull $(DOCKERFILE_CONTAINER_IMAGE)
-	docker pull $(GO_CONTAINER_IMAGE)
-	docker pull $(DEPLOYMENT_BASE_IMAGE):$(DEPLOYMENT_BASE_IMAGE_TAG)
+	docker pull --platform linux/$(ARCH) $(DOCKERFILE_CONTAINER_IMAGE)
+	docker pull --platform linux/$(ARCH) $(GO_CONTAINER_IMAGE)
+	docker pull --platform linux/$(ARCH) $(DEPLOYMENT_BASE_IMAGE):$(DEPLOYMENT_BASE_IMAGE_TAG)
 
 .PHONY: docker-build-all
 docker-build-all: $(addprefix docker-build-,$(ALL_ARCH)) ## Build docker images for all architectures
@@ -424,7 +416,7 @@ docker-build-%:
 
 .PHONY: docker-build
 docker-build: docker-pull-prerequisites ## Build the docker image for core controller manager
-	DOCKER_BUILDKIT=1 docker build $(BUILD_CONTAINER_ADDITIONAL_ARGS) --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg deployment_base_image=$(DEPLOYMENT_BASE_IMAGE) --build-arg deployment_base_image_tag=$(DEPLOYMENT_BASE_IMAGE_TAG) --build-arg goproxy=$(GOPROXY) --build-arg goprivate=$(GOPRIVATE) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . --build-arg go_version=$(GO_VERSION) --build-arg curl_version=$(CURL_VERSION) --build-arg xz_version=$(XZ_VERSION) --build-arg tar_version=$(TAR_VERSION) --build-arg nodejs_version=$(NODEJS_VERSION) --build-arg npm_version=$(NPM_VERSION) --build-arg cdk8s_version=$(CDK8S_VERSION) --build-arg openssh_version=$(OPENSSH_VERSION) --build-arg openssh_client_version=$(OPENSSH_CLIENT_VERSION) -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
+	DOCKER_BUILDKIT=1 docker build --platform linux/$(ARCH) $(BUILD_CONTAINER_ADDITIONAL_ARGS) --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg deployment_base_image=$(DEPLOYMENT_BASE_IMAGE) --build-arg deployment_base_image_tag=$(DEPLOYMENT_BASE_IMAGE_TAG) --build-arg goproxy=$(GOPROXY) --build-arg goprivate=$(GOPRIVATE) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
 	$(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
 	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml"
 
