@@ -32,17 +32,17 @@ func nowStamp() string {
 	return time.Now().Format(time.StampMilli)
 }
 
-func logf(level string, format string, args ...interface{}) {
+func logf(level string, format string, args ...any) {
 	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
 // Logf prints info logs with a timestamp and formatting.
-func Logf(format string, args ...interface{}) {
+func Logf(format string, args ...any) {
 	logf("INFO", format, args...)
 }
 
 // LogWarningf prints warning logs with a timestamp and formatting.
-func LogWarningf(format string, args ...interface{}) {
+func LogWarningf(format string, args ...any) {
 	logf("WARNING", format, args...)
 }
 
