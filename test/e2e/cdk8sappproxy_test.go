@@ -27,14 +27,14 @@ import (
 	"time"
 
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
-	"sigs.k8s.io/cluster-api/test/framework"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
+	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/cluster-api/util"
 )
@@ -116,10 +116,9 @@ var _ = Describe("Workload cluster creation", func() {
 				specName,
 				withNamespace(namespace.Name),
 				withClusterName(clusterName),
-				withControlPlaneMachineCount(1),
-				withWorkerMachineCount(1),
+				withInfrastructureProvider("docker"), // ToDo: Removing hard-coded defnition here, in case we want to switch easier.
 				withControlPlaneWaiters(clusterctl.ControlPlaneWaiters{
-					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized,
+					WaitForControlPlaneInitialized: EnsureControlPlaneInitialized, 
 				}),
 			), result)
 
@@ -130,10 +129,9 @@ var _ = Describe("Workload cluster creation", func() {
 				},
 				Spec: addonsv1alpha1.Cdk8sAppProxySpec{
 					GitRepository: &addonsv1alpha1.GitRepositorySpec{
-						URL:                   "https://github.com/PatrickLaabs/cdk8s-sample-deployment",
-						Reference:             "main",
-						Path:                  ".",
-						// ReferencePollInterval: &metav1.Duration{Duration: 30 * time.Second},
+						URL:       "https://github.com/PatrickLaabs/cdk8s-sample-deployment-public",
+						Reference: "main",
+						Path:      "deployments",
 					},
 					ClusterSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{},
@@ -206,14 +204,16 @@ func dumpSpecResourcesAndCleanup(ctx context.Context, input cleanupInput) {
 		return
 	}
 
-	Logf("Deleting all clusters in the %s namespace", input.Namespace.Name)
+	// Logf("Deleting all clusters in the %s namespace", input.Namespace.Name)
 	// While https://github.com/kubernetes-sigs/cluster-api/issues/2955 is addressed in future iterations, there is a chance
 	// that cluster variable is not set even if the cluster exists, so we are calling DeleteAllClustersAndWait
 	// instead of DeleteClusterAndWait
 	deleteTimeoutConfig := "wait-delete-cluster"
 	framework.DeleteAllClustersAndWait(ctx, framework.DeleteAllClustersAndWaitInput{
-		Client:    input.ClusterProxy.GetClient(),
-		Namespace: input.Namespace.Name,
+		ClusterProxy:         input.ClusterProxy,
+		Namespace:            input.Namespace.Name,
+		ClusterctlConfigPath: clusterctlConfigPath,
+		ArtifactFolder:       input.ArtifactFolder,
 	}, input.IntervalsGetter(input.SpecName, deleteTimeoutConfig)...)
 
 	Logf("Deleting namespace used for hosting the %q test spec", input.SpecName)

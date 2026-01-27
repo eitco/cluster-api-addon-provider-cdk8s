@@ -45,7 +45,7 @@ type GitImplementer struct{}
 func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error) {
 	var auth transport.AuthMethod
 
-	err = os.Mkdir(directory, 0755)
+	err = os.MkdirAll(directory, 0755)
 	if err != nil {
 		logger.Error(err, "Failed to create directory", "directory", directory)
 
@@ -64,7 +64,7 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, 
 	_, err = git.PlainClone(directory, false, &git.CloneOptions{
 		URL:           repoURL,
 		Auth:          auth,
-		ReferenceName: plumbing.ReferenceName(branch),
+		ReferenceName: plumbing.NewBranchReferenceName(branch),
 		Depth:         1,
 	})
 	if err != nil {
