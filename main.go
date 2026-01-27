@@ -199,7 +199,7 @@ func main() {
 	}
 
 	// Any type we want the client to know about has to be added in the scheme.
-	scheme := mgr.GetScheme()
+	scheme = mgr.GetScheme()
 	_ = clusterv1.AddToScheme(scheme)
 	_ = kcpv1.AddToScheme(scheme)
 
@@ -208,8 +208,8 @@ func main() {
 	if err = (&caapccontroller.Reconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor(controllerName),
-	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: cdk8sAppProxyConcurrency}); err != nil {
+		Recorder: mgr.GetEventRecorder(controllerName),
+	}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: cdk8sAppProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cdk8sAppProxy")
 		os.Exit(1)
 	}
@@ -217,9 +217,9 @@ func main() {
 	if err = (&caapccontroller.GeneratorReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorderFor(controllerName),
+		Recorder:       mgr.GetEventRecorder(controllerName),
 		ProviderClient: &gitoperator.GitHubClient{},
-	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: cdk8sAppProxyConcurrency}); err != nil {
+	}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: cdk8sAppProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cdk8sAppProxyGenerator")
 		os.Exit(1)
 	}

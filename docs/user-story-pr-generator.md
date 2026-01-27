@@ -27,7 +27,7 @@ spec:
   pollInterval: 2m  # Check for new PRs every 2 minutes
   source:
     url: https://github.com/my-org/web-app
-    secretRef: github-pat        # Secret containing the GitHub Personal Access Token
+    secretRef: github-pat
     secretKey: token
   template:
     spec:
@@ -55,7 +55,6 @@ metadata:
     - apiVersion: addons.cluster.x-k8s.io/v1alpha1
       kind: Cdk8sAppProxyGenerator
       name: web-app-pr-generator
-      ...
 spec:
   gitRepository:
     url: https://github.com/my-org/web-app
@@ -72,9 +71,3 @@ The existing CAAPC controller then picks up this new `Cdk8sAppProxy`, clones the
 
 ### 5. Cleanup
 Once my PR is merged and closed, the next poll cycle will notice the PR is no longer open. The generator will then ensure the associated `Cdk8sAppProxy` is deleted, which in turn (via finalizers) cleans up the resources in the preview cluster.
-
-## Benefits
-- **Isolation**: Each PR gets its own isolated environment.
-- **Speed**: Preview environments are ready within minutes of opening a PR.
-- **Efficiency**: No manual intervention required for environment management.
-- **Confidence**: Code is verified in a real cluster before merging.
