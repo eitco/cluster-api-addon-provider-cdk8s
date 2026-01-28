@@ -44,6 +44,8 @@ type Implementer struct{}
 func (g *Implementer) Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error) {
 	var auth transport.AuthMethod
 
+	logger.Info("Starting to clone git repository", "repoURL", repoURL, "branch", branch, "directory", directory)
+
 	err = os.MkdirAll(directory, 0755)
 	if err != nil {
 		logger.Error(err, "Failed to create directory", "directory", directory)
@@ -67,10 +69,11 @@ func (g *Implementer) Clone(repoURL string, secretRef []byte, branch string, dir
 		Depth:         1,
 	})
 	if err != nil {
-		logger.Error(err, "Failed to clone repoURL", "repoURL", repoURL)
+		logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
 
 		return err
 	}
+	logger.Info("Successfully cloned git repository", "repoURL", repoURL, "directory", directory)
 
 	return err
 }
@@ -197,6 +200,7 @@ func getAuth(repoURL string, secretRef []byte, logger logr.Logger) (auth transpo
 	return auth, err
 }
 
+// getURLType checks the kind of the given URL, and returns the type of the auth Method.
 func getURLType(repoURL string) authType {
 	if strings.HasPrefix(repoURL, "http://") || strings.HasPrefix(repoURL, "https://") {
 		return authTypeHTTP

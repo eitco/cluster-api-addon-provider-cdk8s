@@ -24,7 +24,6 @@ import (
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	gitoperator "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/git"
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +33,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // GeneratorReconciler reconciles a Cdk8sAppProxyGenerator object.
@@ -60,8 +58,8 @@ func (r *GeneratorReconciler) SetupWithManager(mgr ctrl.Manager, options control
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=cdk8sappproxies,verbs=get;list;watch;create;update;patch;delete
 
 func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithValues("cdk8sappproxygenerator", req.NamespacedName)
-	logger.Info("Starting Generator Reconciler")
+	logs := ctrl.LoggerFrom(ctx).WithValues("cdk8sappproxygenerator", req.NamespacedName)
+	logs.Info("Starting Generator Reconciler")
 
 	generator := &addonsv1alpha1.Cdk8sAppProxyGenerator{}
 	if err := r.Get(ctx, req.NamespacedName, generator); err != nil {
@@ -87,32 +85,38 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Fetch secret for Git authentication if provided.
-	var secretRef []byte
-	if generator.Spec.Source.SecretRef != "" {
-		secret := &corev1.Secret{}
-		secretKey := types.NamespacedName{
-			Namespace: generator.Namespace,
-			Name:      generator.Spec.Source.SecretRef,
-		}
-		if err := r.Get(ctx, secretKey, secret); err != nil {
-			logger.Error(err, "failed to get secret", "secret", generator.Spec.Source.SecretRef)
+	secretRef, err := fetchSecret(ctx, r.Client, generator.Namespace, &generator.Spec.Source, logs)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-			return ctrl.Result{}, err
-		}
-		var ok bool
-		secretRef, ok = secret.Data[generator.Spec.Source.SecretKey]
-		if !ok {
-			err := fmt.Errorf("secret %s does not contain key %s", generator.Spec.Source.SecretRef, generator.Spec.Source.SecretKey)
-			logger.Error(err, "secret key not found")
+	// Check access before listing pull requests.
+	gitImpl := &gitoperator.Implementer{}
+	accessible, requiredAuth, err := gitImpl.CheckAccess(generator.Spec.Source.URL, secretRef, logs)
+	if err != nil {
+		logs.Error(err, "failed to check repository access")
 
-			return ctrl.Result{}, err
-		}
+		return ctrl.Result{}, err
+	}
+
+	if requiredAuth && len(secretRef) == 0 {
+		err := fmt.Errorf("repository requires authentication but no secretRef was provided")
+		logs.Error(err, "authentication required")
+
+		return ctrl.Result{}, err
+	}
+
+	if !accessible {
+		err := fmt.Errorf("repository is not accessible")
+		logs.Error(err, "access denied")
+
+		return ctrl.Result{}, err
 	}
 
 	// List pull requests.
-	prs, err := r.ProviderClient.ListPullRequests(ctx, generator.Spec.Source.URL, secretRef, logger)
+	prs, err := r.ProviderClient.ListPullRequests(ctx, generator.Spec.Source.URL, secretRef, logs)
 	if err != nil {
-		logger.Error(err, "failed to list pull requests")
+		logs.Error(err, "failed to list pull requests")
 
 		return ctrl.Result{}, err
 	}
@@ -120,7 +124,7 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Process each PR.
 	for _, pr := range prs {
 		if err := r.reconcilePR(ctx, generator, pr); err != nil {
-			logger.Error(err, "failed to reconcile PR", "prNumber", pr.Number)
+			logs.Error(err, "failed to reconcile PR", "prNumber", pr.Number)
 			// Continue with other PRs.
 		}
 	}
@@ -136,7 +140,7 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return r.Status().Update(ctx, latest)
 	})
 	if err != nil {
-		logger.Error(err, "failed to update status")
+		logs.Error(err, "failed to update status")
 
 		return ctrl.Result{}, err
 	}
@@ -145,7 +149,7 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addonsv1alpha1.Cdk8sAppProxyGenerator, pr gitoperator.PullRequest) error {
-	logger := log.FromContext(ctx).WithValues("prNumber", pr.Number)
+	logs := ctrl.LoggerFrom(ctx).WithValues("prNumber", pr.Number)
 
 	// Apply filters.
 	if len(generator.Spec.Filters) > 0 {
@@ -158,7 +162,7 @@ func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addons
 			}
 		}
 		if !match {
-			logger.Info("PR does not match any filters, skipping", "baseBranch", pr.BaseBranch)
+			logs.Info("PR does not match any filters, skipping", "baseBranch", pr.BaseBranch)
 
 			return nil
 		}
@@ -209,7 +213,7 @@ func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addons
 	err := r.Get(ctx, types.NamespacedName{Namespace: proxy.Namespace, Name: proxy.Name}, existingProxy)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Info("Creating Cdk8sAppProxy for PR", "proxyName", proxyName)
+			logs.Info("Creating Cdk8sAppProxy for PR", "proxyName", proxyName)
 
 			return r.Create(ctx, proxy)
 		}
@@ -217,7 +221,7 @@ func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addons
 		return err
 	}
 
-	logger.Info("Updating Cdk8sAppProxy for PR", "proxyName", proxyName, "ref", proxy.Spec.GitRepository.Reference, "path", proxy.Spec.GitRepository.Path)
+	logs.Info("Updating Cdk8sAppProxy for PR", "proxyName", proxyName, "ref", proxy.Spec.GitRepository.Reference, "path", proxy.Spec.GitRepository.Path)
 	existingProxy.Spec = proxy.Spec
 	existingProxy.Labels = proxy.Labels
 	existingProxy.Annotations = proxy.Annotations
