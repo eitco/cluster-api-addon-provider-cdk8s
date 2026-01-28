@@ -122,3 +122,108 @@ func TestCheckAccess(t *testing.T) {
 		_ = requiresAuth
 	})
 }
+
+func TestDetectProvider(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		expected GitProvider
+	}{
+		{"GitHub HTTPS", "https://github.com/owner/repo", GitProviderGitHub},
+		{"GitHub SSH", "git@github.com:owner/repo.git", GitProviderGitHub},
+		{"GitLab HTTPS", "https://gitlab.com/owner/repo", GitProviderGitLab},
+		{"GitLab SSH", "git@gitlab.com:owner/repo.git", GitProviderGitLab},
+		{"Bitbucket HTTPS", "https://bitbucket.org/owner/repo", GitProviderBitbucket},
+		{"Bitbucket SSH", "git@bitbucket.org:owner/repo.git", GitProviderBitbucket},
+		{"Unknown", "https://example.com/owner/repo", GitProviderUnknown},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := DetectProvider(tt.url); got != tt.expected {
+				t.Errorf("DetectProvider() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseURL(t *testing.T) {
+	t.Run("GitHub", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			url       string
+			wantOwner string
+			wantRepo  string
+			wantErr   bool
+		}{
+			{"HTTPS", "https://github.com/owner/repo", "owner", "repo", false},
+			{"SSH", "git@github.com:owner/repo.git", "owner", "repo", false},
+			{"Invalid", "https://example.com/repo", "", "", true},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				owner, repo, err := parseRepoURL(tt.url, "github.com", false)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("parseRepoURL() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if owner != tt.wantOwner || repo != tt.wantRepo {
+					t.Errorf("parseRepoURL() = (%v, %v), want (%v, %v)", owner, repo, tt.wantOwner, tt.wantRepo)
+				}
+			})
+		}
+	})
+
+	t.Run("GitLab", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			url       string
+			wantOwner string
+			wantRepo  string
+			wantErr   bool
+		}{
+			{"HTTPS", "https://gitlab.com/owner/repo", "owner", "repo", false},
+			{"SSH", "git@gitlab.com:owner/repo.git", "owner", "repo", false},
+			{"Nested", "https://gitlab.com/owner/group/repo", "owner", "group/repo", false},
+			{"Invalid", "https://example.com/repo", "", "", true},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				owner, repo, err := parseRepoURL(tt.url, "gitlab.com", true)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("parseRepoURL() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if owner != tt.wantOwner || repo != tt.wantRepo {
+					t.Errorf("parseRepoURL() = (%v, %v), want (%v, %v)", owner, repo, tt.wantOwner, tt.wantRepo)
+				}
+			})
+		}
+	})
+
+	t.Run("Bitbucket", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			url       string
+			wantOwner string
+			wantRepo  string
+			wantErr   bool
+		}{
+			{"HTTPS", "https://bitbucket.org/owner/repo", "owner", "repo", false},
+			{"SSH", "git@bitbucket.org:owner/repo.git", "owner", "repo", false},
+			{"Invalid", "https://example.com/repo", "", "", true},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				owner, repo, err := parseRepoURL(tt.url, "bitbucket.org", false)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("parseRepoURL() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				if owner != tt.wantOwner || repo != tt.wantRepo {
+					t.Errorf("parseRepoURL() = (%v, %v), want (%v, %v)", owner, repo, tt.wantOwner, tt.wantRepo)
+				}
+			})
+		}
+	})
+}

@@ -24,6 +24,7 @@ import (
 	gitoperator "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/git"
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/resourcer"
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/synthesizer"
+	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/utils"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,7 +98,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	}(directory)
 
 	// Fetch secret for Git authentication if provided.
-	secretRef, err := fetchSecret(ctx, r.Client, cdk8sAppProxy.Namespace, cdk8sAppProxy.Spec.GitRepository, logs)
+	secretRef, err := utils.FetchSecret(ctx, r.Client, cdk8sAppProxy.Namespace, cdk8sAppProxy.Spec.GitRepository, logs)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

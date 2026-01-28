@@ -23,6 +23,7 @@ import (
 
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	gitoperator "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/git"
+	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/utils"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,9 +39,8 @@ import (
 // GeneratorReconciler reconciles a Cdk8sAppProxyGenerator object.
 type GeneratorReconciler struct {
 	client.Client
-	Scheme         *runtime.Scheme
-	Recorder       events.EventRecorder
-	ProviderClient gitoperator.ProviderClient
+	Scheme   *runtime.Scheme
+	Recorder events.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -85,7 +85,7 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Fetch secret for Git authentication if provided.
-	secretRef, err := fetchSecret(ctx, r.Client, generator.Namespace, &generator.Spec.Source, logs)
+	secretRef, err := utils.FetchSecret(ctx, r.Client, generator.Namespace, &generator.Spec.Source, logs)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -114,7 +114,14 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// List pull requests.
-	prs, err := r.ProviderClient.ListPullRequests(ctx, generator.Spec.Source.URL, secretRef, logs)
+	providerClient, err := gitoperator.NewProviderClient(generator.Spec.Source.URL, nil)
+	if err != nil {
+		logs.Error(err, "failed to get provider client")
+
+		return ctrl.Result{}, err
+	}
+
+	prs, err := providerClient.ListPullRequests(ctx, generator.Spec.Source.URL, secretRef, logs)
 	if err != nil {
 		logs.Error(err, "failed to list pull requests")
 
@@ -148,7 +155,7 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{RequeueAfter: pollInterval}, nil
 }
 
-func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addonsv1alpha1.Cdk8sAppProxyGenerator, pr gitoperator.PullRequest) error {
+func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addonsv1alpha1.Cdk8sAppProxyGenerator, pr gitoperator.PullRequest) (err error) {
 	logs := ctrl.LoggerFrom(ctx).WithValues("prNumber", pr.Number)
 
 	// Apply filters.
@@ -210,7 +217,7 @@ func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addons
 
 	// Create or Update the Cdk8sAppProxy.
 	existingProxy := &addonsv1alpha1.Cdk8sAppProxy{}
-	err := r.Get(ctx, types.NamespacedName{Namespace: proxy.Namespace, Name: proxy.Name}, existingProxy)
+	err = r.Get(ctx, types.NamespacedName{Namespace: proxy.Namespace, Name: proxy.Name}, existingProxy)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logs.Info("Creating Cdk8sAppProxy for PR", "proxyName", proxyName)

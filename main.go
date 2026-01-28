@@ -24,7 +24,6 @@ import (
 
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	caapccontroller "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers"
-	gitoperator "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/git"
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/version"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -215,10 +214,9 @@ func main() {
 	}
 
 	if err = (&caapccontroller.GeneratorReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorder(controllerName),
-		ProviderClient: &gitoperator.GitHubClient{},
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorder(controllerName),
 	}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: cdk8sAppProxyConcurrency}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cdk8sAppProxyGenerator")
 		os.Exit(1)

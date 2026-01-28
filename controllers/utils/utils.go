@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package utils
 
 import (
 	"context"
@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func fetchSecret(ctx context.Context, c client.Client, namespace string, spec *addonsv1alpha1.GitRepositorySpec, logs logr.Logger) (secretRef []byte, err error) {
+func FetchSecret(ctx context.Context, c client.Client, namespace string, spec *addonsv1alpha1.GitRepositorySpec, logs logr.Logger) (secretRef []byte, err error) {
 	if spec == nil || spec.SecretRef == "" {
 		logs.Error(err, "secret reference is empty")
 
