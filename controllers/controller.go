@@ -41,9 +41,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const (
-	Finalizer = "cdk8sappproxy.addons.cluster.x-k8s.io/finalizer"
-)
+//const (
+//	Finalizer = "cdk8sappproxy.addons.cluster.x-k8s.io/finalizer"
+//)
 
 type Reconciler struct {
 	client.Client
@@ -75,7 +75,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	logger := log.FromContext(ctx).WithValues("cdk8sappproxy", req.NamespacedName)
 	logger.Info("Starting Reconciler")
 
-	gitImpl := &gitoperator.GitImplementer{}
+	gitImpl := &gitoperator.Implementer{}
 	synthImpl := &synthesizer.Implementer{}
 	resourcerImpl := &resourcer.Implementer{
 		Client: r.Client,
@@ -100,7 +100,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	secretKey := cdk8sAppProxy.Spec.GitRepository.SecretKey
 	secretName := cdk8sAppProxy.Spec.GitRepository.SecretRef
 
-	defer os.RemoveAll(directory)
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		if err != nil {
+			logger.Error(err, "Failed to clean-up directory", "path", path)
+		}
+	}(directory)
 
 	var (
 		secretRef []byte
@@ -219,11 +224,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 // ClusterToCdk8sAppProxyMapper is a handler.ToRequestsFunc to be used to enqeue requests for Cdk8sAppProxyReconciler.
 // It maps CAPI Cluster events to Cdk8sAppProxy events.
 func (r *Reconciler) ClusterToCdk8sAppProxyMapper(ctx context.Context, o client.Object) (results []ctrl.Request) {
-	log := ctrl.LoggerFrom(ctx)
+	logger := ctrl.LoggerFrom(ctx)
 
 	cluster, ok := o.(*clusterv1.Cluster)
 	if !ok {
-		log.Error(errors.Errorf("expected a Cluster but got %T", o), "failed to map object to Cdk8sAppProxy")
+		logger.Error(errors.Errorf("expected a Cluster but got %T", o), "failed to map object to Cdk8sAppProxy")
 
 		return results
 	}
@@ -237,7 +242,7 @@ func (r *Reconciler) ClusterToCdk8sAppProxyMapper(ctx context.Context, o client.
 	for _, cdk8sAppProxy := range cdk8sappproxies.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&cdk8sAppProxy.Spec.ClusterSelector)
 		if err != nil {
-			log.Error(err, "failed to parse ClusterSelector for Cdk8sAppProxy", "cdk8sAppProxy", cdk8sAppProxy.Name)
+			logger.Error(err, "failed to parse ClusterSelector for Cdk8sAppProxy", "cdk8sAppProxy", cdk8sAppProxy.Name)
 
 			return results
 		}

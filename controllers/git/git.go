@@ -1,7 +1,6 @@
 /*
-Package git holds every implemention needed
+Package git holds every implementation needed
 to do various git operations.
-This is a interface-first implemention.
 */
 package git
 
@@ -30,19 +29,19 @@ const (
 	authTypeHTTP authType = "http"
 )
 
-// GitOperator defines the interface for git operations.
-type GitOperator interface {
+// Operator defines the interface for git operations.
+type Operator interface {
 	Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error)
 	Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error)
 	Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error)
 	CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error)
 }
 
-// GitImplementer implements the GitOperator interface.
-type GitImplementer struct{}
+// Implementer implements the GitOperator interface.
+type Implementer struct{}
 
-// Clone clones the given repoURLsitory to a local directory.
-func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error) {
+// Clone clones the given repository to a local directory.
+func (g *Implementer) Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error) {
 	var auth transport.AuthMethod
 
 	err = os.MkdirAll(directory, 0755)
@@ -76,8 +75,8 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, 
 	return err
 }
 
-// Poll polls for changes for the given remote git repoURLsitory. Returns true, if current local commit hash and remote hash are not equal.
-func (g *GitImplementer) Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error) {
+// Poll polls for changes for the given remote git repository. Returns true, if current local commit hash and remote hash are not equal.
+func (g *Implementer) Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error) {
 	// Defaults to false. We only change to true if there is a difference between the hashes.
 	changes = false
 
@@ -104,7 +103,7 @@ func (g *GitImplementer) Poll(repoURL string, secretRef []byte, branch string, d
 	return changes, err
 }
 
-func (g *GitImplementer) Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
+func (g *Implementer) Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
 	if isURL(repoURL) {
 		return g.remoteHash(repoURL, secretRef, branch, logger)
 	}
@@ -112,7 +111,7 @@ func (g *GitImplementer) Hash(repoURL string, secretRef []byte, branch string, l
 	return g.localHash(repoURL, logger)
 }
 
-func (g *GitImplementer) CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error) {
+func (g *Implementer) CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error) {
 	remoteRepo := git.NewRemote(nil, &config.RemoteConfig{
 		URLs: []string{repoURL},
 	})
@@ -217,7 +216,7 @@ func getURLType(repoURL string) authType {
 }
 
 // localHash retrieves the HEAD commit hash from a local repository.
-func (g *GitImplementer) localHash(path string, logger logr.Logger) (hash string, err error) {
+func (g *Implementer) localHash(path string, logger logr.Logger) (hash string, err error) {
 	localRepo, err := git.PlainOpen(path)
 	if err != nil {
 		logger.Error(err, "failed to open local repo")
@@ -236,7 +235,7 @@ func (g *GitImplementer) localHash(path string, logger logr.Logger) (hash string
 	return hash, err
 }
 
-func (g *GitImplementer) remoteHash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
+func (g *Implementer) remoteHash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
 	auth, err := getAuth(repoURL, secretRef, logger)
 	if err != nil {
 		return hash, err
