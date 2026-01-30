@@ -127,15 +127,14 @@ func TestDetectProvider(t *testing.T) {
 	tests := []struct {
 		name     string
 		url      string
-		expected GitProvider
+		expected Provider
 	}{
-		{"GitHub HTTPS", "https://github.com/owner/repo", GitProviderGitHub},
-		{"GitHub SSH", "git@github.com:owner/repo.git", GitProviderGitHub},
-		{"GitLab HTTPS", "https://gitlab.com/owner/repo", GitProviderGitLab},
-		{"GitLab SSH", "git@gitlab.com:owner/repo.git", GitProviderGitLab},
-		{"Bitbucket HTTPS", "https://bitbucket.org/owner/repo", GitProviderBitbucket},
-		{"Bitbucket SSH", "git@bitbucket.org:owner/repo.git", GitProviderBitbucket},
-		{"Unknown", "https://example.com/owner/repo", GitProviderUnknown},
+		{"GitHub HTTPS", "https://github.com/owner/repo", ProviderGitHub},
+		{"GitHub SSH", "git@github.com:owner/repo.git", ProviderGitHub},
+		{"GitLab HTTPS", "https://gitlab.com/owner/repo", ProviderGitLab},
+		{"GitLab SSH", "git@gitlab.com:owner/repo.git", ProviderGitLab},
+		{"Bitbucket HTTPS", "https://bitbucket.org/owner/repo", ProviderBitbucket},
+		{"Bitbucket SSH", "git@bitbucket.org:owner/repo.git", ProviderBitbucket},
 	}
 
 	for _, tt := range tests {
@@ -165,6 +164,7 @@ func TestParseURL(t *testing.T) {
 				owner, repo, err := parseRepoURL(tt.url, "github.com", false)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("parseRepoURL() error = %v, wantErr %v", err, tt.wantErr)
+
 					return
 				}
 				if owner != tt.wantOwner || repo != tt.wantRepo {
@@ -192,6 +192,7 @@ func TestParseURL(t *testing.T) {
 				owner, repo, err := parseRepoURL(tt.url, "gitlab.com", true)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("parseRepoURL() error = %v, wantErr %v", err, tt.wantErr)
+
 					return
 				}
 				if owner != tt.wantOwner || repo != tt.wantRepo {
@@ -218,6 +219,7 @@ func TestParseURL(t *testing.T) {
 				owner, repo, err := parseRepoURL(tt.url, "bitbucket.org", false)
 				if (err != nil) != tt.wantErr {
 					t.Errorf("parseRepoURL() error = %v, wantErr %v", err, tt.wantErr)
+
 					return
 				}
 				if owner != tt.wantOwner || repo != tt.wantRepo {

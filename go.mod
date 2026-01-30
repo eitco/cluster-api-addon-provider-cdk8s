@@ -1,6 +1,8 @@
 module github.com/eitco/cluster-api-addon-provider-cdk8s
 
-go 1.25.6
+go 1.25.0
+
+toolchain go1.25.6
 
 require (
 	github.com/go-git/go-git/v5 v5.16.4

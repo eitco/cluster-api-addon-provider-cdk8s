@@ -22,19 +22,15 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 )
 
-// GitProvider represents a Git provider type.
-type GitProvider string
+// Provider represents a Git provider type.
+type Provider string
 
 const (
-	GitProviderGitHub    GitProvider = "github"
-	GitProviderGitLab    GitProvider = "gitlab"
-	GitProviderBitbucket GitProvider = "bitbucket"
-	GitProviderUnknown   GitProvider = "unknown"
+	ProviderGitHub    Provider = "github"
+	ProviderGitLab    Provider = "gitlab"
+	ProviderBitbucket Provider = "bitbucket"
 )
 
 // PullRequest represents a pull request from a Git provider.
@@ -48,29 +44,26 @@ type PullRequest struct {
 
 // ProviderClient defines the interface for Git provider operations.
 type ProviderClient interface {
-	ListPullRequests(ctx context.Context, repoURL string, secretRef []byte, logger logr.Logger) (prs []PullRequest, err error)
+	ListPullRequests(ctx context.Context, repoURL string, secretRef []byte) (prs []PullRequest, err error)
 }
 
 // NewProviderClient returns the appropriate ProviderClient for the given repoURL.
 func NewProviderClient(repoURL string, httpClient *http.Client) (client ProviderClient, err error) {
 	provider := DetectProvider(repoURL)
-	if provider == GitProviderUnknown {
-		return nil, fmt.Errorf("unsupported Git provider for URL: %s", repoURL)
-	}
 
 	host := ""
 	allowNested := false
 	switch provider {
-	case GitProviderGitHub:
+	case ProviderGitHub:
 		host = "github.com"
-	case GitProviderGitLab:
+	case ProviderGitLab:
 		host = "gitlab.com"
 		allowNested = true
-	case GitProviderBitbucket:
+	case ProviderBitbucket:
 		host = "bitbucket.org"
 	}
 
-	return &GitClient{
+	return &Client{
 		httpClientContainer: httpClientContainer{httpClient: httpClient},
 		provider:            provider,
 		host:                host,
@@ -87,13 +80,16 @@ func (h *httpClientContainer) getHTTPClient() *http.Client {
 	if h.httpClient == nil {
 		return http.DefaultClient
 	}
+
 	return h.httpClient
 }
 
-func (h *httpClientContainer) doJSONRequest(ctx context.Context, apiURL string, headers map[string]string, target interface{}) (err error) {
+func (h *httpClientContainer) doJSONRequest(ctx context.Context, apiURL string, headers map[string]string, target any) (err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
 	if err != nil {
-		return errors.Wrap(err, "failed to create request")
+		fmt.Println("replace me")
+
+		return err
 	}
 
 	for k, v := range headers {
@@ -102,8 +98,9 @@ func (h *httpClientContainer) doJSONRequest(ctx context.Context, apiURL string, 
 
 	resp, err := h.getHTTPClient().Do(req)
 	if err != nil {
-		return errors.Wrap(err, "failed to execute request")
+		return fmt.Errorf("failed to execute request: %w", err)	
 	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -111,38 +108,38 @@ func (h *httpClientContainer) doJSONRequest(ctx context.Context, apiURL string, 
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
-		return errors.Wrap(err, "failed to decode response")
+		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	return nil
 }
 
 // DetectProvider determines the Git provider based on the repository URL.
-func DetectProvider(repoURL string) (provider GitProvider) {
+func DetectProvider(repoURL string) (provider Provider) {
 	repoURL = strings.ToLower(repoURL)
 	if strings.Contains(repoURL, "github.com") {
-		return GitProviderGitHub
+		return ProviderGitHub
 	}
 	if strings.Contains(repoURL, "gitlab.com") {
-		return GitProviderGitLab
+		return ProviderGitLab
 	}
 	if strings.Contains(repoURL, "bitbucket.org") {
-		return GitProviderBitbucket
+		return ProviderBitbucket
 	}
 
-	return GitProviderUnknown
+	return provider
 }
 
-// GitClient implements the ProviderClient interface for various Git providers.
-type GitClient struct {
+// Client implements the ProviderClient interface for various Git providers.
+type Client struct {
 	httpClientContainer
-	provider    GitProvider
+	provider    Provider
 	host        string
 	allowNested bool
 }
 
 // ListPullRequests lists open pull requests for the repository.
-func (c *GitClient) ListPullRequests(ctx context.Context, repoURL string, secretRef []byte, logger logr.Logger) (prs []PullRequest, err error) {
+func (c *Client) ListPullRequests(ctx context.Context, repoURL string, secretRef []byte) (prs []PullRequest, err error) {
 	owner, repo, err := parseRepoURL(repoURL, c.host, c.allowNested)
 	if err != nil {
 		return nil, err
@@ -152,27 +149,30 @@ func (c *GitClient) ListPullRequests(ctx context.Context, repoURL string, secret
 	headers := make(map[string]string)
 
 	switch c.provider {
-	case GitProviderGitHub:
+	case ProviderGitHub:
 		apiURL = fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=open", owner, repo)
 		headers["Accept"] = "application/vnd.github.v3+json"
 		if len(secretRef) > 0 {
 			headers["Authorization"] = fmt.Sprintf("token %s", string(secretRef))
 		}
+
 		return c.fetchGitHubPRs(ctx, apiURL, headers)
 
-	case GitProviderGitLab:
+	case ProviderGitLab:
 		projectID := urlPathEscape(fmt.Sprintf("%s/%s", owner, repo))
 		apiURL = fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/merge_requests?state=opened", projectID)
 		if len(secretRef) > 0 {
 			headers["Private-Token"] = string(secretRef)
 		}
+
 		return c.fetchGitLabMRs(ctx, apiURL, headers)
 
-	case GitProviderBitbucket:
+	case ProviderBitbucket:
 		apiURL = fmt.Sprintf("https://api.bitbucket.org/2.0/repositories/%s/%s/pullrequests?state=OPEN", owner, repo)
 		if len(secretRef) > 0 {
 			headers["Authorization"] = fmt.Sprintf("Bearer %s", string(secretRef))
 		}
+
 		return c.fetchBitbucketPRs(ctx, apiURL, headers)
 
 	default:
@@ -180,7 +180,7 @@ func (c *GitClient) ListPullRequests(ctx context.Context, repoURL string, secret
 	}
 }
 
-func (c *GitClient) fetchGitHubPRs(ctx context.Context, apiURL string, headers map[string]string) ([]PullRequest, error) {
+func (c *Client) fetchGitHubPRs(ctx context.Context, apiURL string, headers map[string]string) (prs []PullRequest, err error) {
 	var ghPRs []struct {
 		Number int `json:"number"`
 		Head   struct {
@@ -193,10 +193,10 @@ func (c *GitClient) fetchGitHubPRs(ctx context.Context, apiURL string, headers m
 	}
 
 	if err := c.doJSONRequest(ctx, apiURL, headers, &ghPRs); err != nil {
-		return nil, errors.Wrap(err, "github api request failed")
+		return nil, fmt.Errorf("github api request failed: %w", err)
 	}
 
-	prs := make([]PullRequest, len(ghPRs))
+	prs = make([]PullRequest, len(ghPRs))
 	for i, ghPR := range ghPRs {
 		prs[i] = PullRequest{
 			Number:     ghPR.Number,
@@ -205,10 +205,11 @@ func (c *GitClient) fetchGitHubPRs(ctx context.Context, apiURL string, headers m
 			BaseBranch: ghPR.Base.Ref,
 		}
 	}
-	return prs, nil
+
+	return prs, err
 }
 
-func (c *GitClient) fetchGitLabMRs(ctx context.Context, apiURL string, headers map[string]string) ([]PullRequest, error) {
+func (c *Client) fetchGitLabMRs(ctx context.Context, apiURL string, headers map[string]string) ([]PullRequest, error) {
 	var glMRs []struct {
 		IID          int    `json:"iid"`
 		SourceBranch string `json:"source_branch"`
@@ -217,7 +218,7 @@ func (c *GitClient) fetchGitLabMRs(ctx context.Context, apiURL string, headers m
 	}
 
 	if err := c.doJSONRequest(ctx, apiURL, headers, &glMRs); err != nil {
-		return nil, errors.Wrap(err, "gitlab api request failed")
+		return nil, fmt.Errorf("gitlab api request failed: %w", err)
 	}
 
 	prs := make([]PullRequest, len(glMRs))
@@ -229,10 +230,11 @@ func (c *GitClient) fetchGitLabMRs(ctx context.Context, apiURL string, headers m
 			BaseBranch: glMR.TargetBranch,
 		}
 	}
+
 	return prs, nil
 }
 
-func (c *GitClient) fetchBitbucketPRs(ctx context.Context, apiURL string, headers map[string]string) ([]PullRequest, error) {
+func (c *Client) fetchBitbucketPRs(ctx context.Context, apiURL string, headers map[string]string) ([]PullRequest, error) {
 	var bbPRs struct {
 		Values []struct {
 			ID     int `json:"id"`
@@ -253,7 +255,7 @@ func (c *GitClient) fetchBitbucketPRs(ctx context.Context, apiURL string, header
 	}
 
 	if err := c.doJSONRequest(ctx, apiURL, headers, &bbPRs); err != nil {
-		return nil, errors.Wrap(err, "bitbucket api request failed")
+		return nil, fmt.Errorf("bitbucket api request failed: %w", err)
 	}
 
 	prs := make([]PullRequest, len(bbPRs.Values))
@@ -265,6 +267,7 @@ func (c *GitClient) fetchBitbucketPRs(ctx context.Context, apiURL string, header
 			BaseBranch: bbPR.Destination.Branch.Name,
 		}
 	}
+
 	return prs, nil
 }
 
@@ -282,6 +285,7 @@ func parseRepoURL(repoURL string, host string, allowNested bool) (owner string, 
 			} else {
 				repo = parts[1]
 			}
+
 			return owner, repo, nil
 		}
 	}
@@ -297,6 +301,7 @@ func parseRepoURL(repoURL string, host string, allowNested bool) (owner string, 
 			} else {
 				repo = parts[1]
 			}
+
 			return owner, repo, nil
 		}
 	}

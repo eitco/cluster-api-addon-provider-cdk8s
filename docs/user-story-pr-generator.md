@@ -31,9 +31,9 @@ spec:
     secretKey: token
   template:
     spec:
-      clusterSelector:
-        matchLabels:
-          environment: preview-cluster
+      clusterSelector: {}
+        # matchLabels:
+        #   environment: preview-cluster
 ```
 
 ### 2. Automatic Detection

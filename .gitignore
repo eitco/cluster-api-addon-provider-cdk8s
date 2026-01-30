@@ -43,3 +43,4 @@ tmp/
 out/
 
 hack/ssh_known_hosts
+capg.yaml

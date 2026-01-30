@@ -57,14 +57,14 @@ func (r *GeneratorReconciler) SetupWithManager(mgr ctrl.Manager, options control
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=cdk8sappproxygenerators/finalizers,verbs=update
 //+kubebuilder:rbac:groups=addons.cluster.x-k8s.io,resources=cdk8sappproxies,verbs=get;list;watch;create;update;patch;delete
 
-func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (controller ctrl.Result, err error) {
 	logs := ctrl.LoggerFrom(ctx).WithValues("cdk8sappproxygenerator", req.NamespacedName)
 	logs.Info("Starting Generator Reconciler")
 
 	generator := &addonsv1alpha1.Cdk8sAppProxyGenerator{}
-	if err := r.Get(ctx, req.NamespacedName, generator); err != nil {
+	if err = r.Get(ctx, req.NamespacedName, generator); err != nil {
 		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+			return ctrl.Result{}, err
 		}
 
 		return ctrl.Result{}, err
@@ -80,7 +80,7 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if generator.Status.LastPolledTime != nil {
 		nextPoll := generator.Status.LastPolledTime.Add(pollInterval)
 		if time.Now().Before(nextPoll) {
-			return ctrl.Result{RequeueAfter: time.Until(nextPoll)}, nil
+			return ctrl.Result{RequeueAfter: time.Until(nextPoll)}, err
 		}
 	}
 
@@ -100,15 +100,13 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if requiredAuth && len(secretRef) == 0 {
-		err := fmt.Errorf("repository requires authentication but no secretRef was provided")
-		logs.Error(err, "authentication required")
+		logs.Error(err, "Repository requires authentication but no secretRef was provided.")
 
 		return ctrl.Result{}, err
 	}
 
 	if !accessible {
-		err := fmt.Errorf("repository is not accessible")
-		logs.Error(err, "access denied")
+		logs.Error(err, "repository is not accessible. Access Denied")
 
 		return ctrl.Result{}, err
 	}
@@ -121,7 +119,7 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, err
 	}
 
-	prs, err := providerClient.ListPullRequests(ctx, generator.Spec.Source.URL, secretRef, logs)
+	prs, err := providerClient.ListPullRequests(ctx, generator.Spec.Source.URL, secretRef)
 	if err != nil {
 		logs.Error(err, "failed to list pull requests")
 
@@ -130,16 +128,15 @@ func (r *GeneratorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Process each PR.
 	for _, pr := range prs {
-		if err := r.reconcilePR(ctx, generator, pr); err != nil {
+		if err = r.reconcilePR(ctx, generator, pr); err != nil {
 			logs.Error(err, "failed to reconcile PR", "prNumber", pr.Number)
-			// Continue with other PRs.
 		}
 	}
 
 	// Update last polled time.
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		latest := &addonsv1alpha1.Cdk8sAppProxyGenerator{}
-		if err := r.Get(ctx, req.NamespacedName, latest); err != nil {
+		if err = r.Get(ctx, req.NamespacedName, latest); err != nil {
 			return err
 		}
 		latest.Status.LastPolledTime = &metav1.Time{Time: time.Now()}
@@ -194,7 +191,7 @@ func (r *GeneratorReconciler) reconcilePR(ctx context.Context, generator *addons
 	proxy.Labels["addons.cluster.x-k8s.io/pr-number"] = fmt.Sprintf("%d", pr.Number)
 
 	// Set OwnerReference.
-	if err := ctrl.SetControllerReference(generator, proxy, r.Scheme); err != nil {
+	if err = ctrl.SetControllerReference(generator, proxy, r.Scheme); err != nil {
 		return errors.Wrap(err, "failed to set controller reference")
 	}
 

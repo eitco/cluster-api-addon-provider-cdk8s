@@ -68,14 +68,13 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	logs := ctrl.LoggerFrom(ctx).WithValues("cdk8sappproxy", req.NamespacedName)
 	logs.Info("Reconciling CDk8sAppProxy")
 
-	gitImpl := &gitoperator.Implementer{}
 	synthImpl := &synthesizer.Implementer{}
 	resourcerImpl := &resourcer.Implementer{
 		Client: r.Client,
 	}
 	cdk8sAppProxy := &addonsv1alpha1.Cdk8sAppProxy{}
 
-	if err := r.Get(ctx, req.NamespacedName, cdk8sAppProxy); err != nil {
+	if err = r.Get(ctx, req.NamespacedName, cdk8sAppProxy); err != nil {
 		if apierrors.IsNotFound(err) {
 			logs.Error(err, "cdk8sAppProxy resource not found")
 
@@ -104,7 +103,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	}
 
 	// Check access before Cloning
-	_, requiredAuth, err := gitImpl.CheckAccess(repoURL, secretRef, logs)
+	gitImpl := &gitoperator.Implementer{}
+	accessible, requiredAuth, err := gitImpl.CheckAccess(repoURL, secretRef, logs)
 	if err != nil {
 		logs.Error(err, "Failed to check repository access")
 
@@ -113,6 +113,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 	if requiredAuth && len(secretRef) == 0 {
 		logs.Error(err, "Repository requires authentication but no secretRef was provided.")
+
+		return ctrl.Result{}, err
+	}
+
+	if !accessible {
+		logs.Error(err, "repository is not accessible. Access Denied")
 
 		return ctrl.Result{}, err
 	}
