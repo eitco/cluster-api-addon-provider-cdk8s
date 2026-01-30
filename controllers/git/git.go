@@ -1,11 +1,12 @@
 /*
-Package git holds every implemention needed
+Package git holds every implementation needed
 to do various git operations.
-This is a interface-first implemention.
 */
 package git
 
 import (
+	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"strings"
@@ -19,7 +20,11 @@ import (
 	"github.com/go-logr/logr"
 )
 
-type authType string
+type (
+	authType string
+	// Provider represents a Git provider type.
+	providerType string
+)
 
 const (
 	// authTypeUnknown indicates we can't determine the auth type from the URL.
@@ -28,24 +33,53 @@ const (
 	authTypeSSH authType = "ssh"
 	// authTypeHTTP indicates the URL is for HTTP/S authentication.
 	authTypeHTTP authType = "http"
+	// ProviderGitHub defines the Provider type of GitHub.
+	ProviderGitHub providerType = "github"
+	// ProviderGitLab defines the Provider type of GitLab.
+	ProviderGitLab providerType = "gitlab"
+	// ProviderBitbucket defines the Provider type of BitBucket.
+	ProviderBitbucket providerType = "bitbucket"
 )
 
-// GitOperator defines the interface for git operations.
-type GitOperator interface {
+type PullRequest struct {
+	ID         int    `json:"id"`
+	Number     int    `json:"number"`
+	Branch     string `json:"branch"`
+	HeadSHA    string `json:"head_sha"`
+	BaseBranch string `json:"base_branch"`
+}
+
+// Client implements the ProviderClient interface for various Git providers.
+type Client struct {
+	httpClientContainer
+	provider    providerType
+	host        string
+	allowNested bool
+}
+
+// Operator defines the interface for git operations.
+type Operator interface {
 	Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error)
 	Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error)
 	Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error)
 	CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error)
+	ListPullRequests(ctx context.Context, repoURL string, secretRef []byte) (prs []PullRequest, err error)
 }
 
-// GitImplementer implements the GitOperator interface.
-type GitImplementer struct{}
+type ProviderClient interface {
+	ListPullRequests(ctx context.Context, repoURL string, secretRef []byte) (prs []PullRequest, err error)
+}
 
-// Clone clones the given repoURLsitory to a local directory.
-func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error) {
+// Implementer implements the GitOperator interface.
+type Implementer struct{}
+
+// Clone clones the given repository to a local directory.
+func (g *Implementer) Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error) {
 	var auth transport.AuthMethod
 
-	err = os.Mkdir(directory, 0755)
+	logger.Info("Starting to clone git repository", "repoURL", repoURL, "branch", branch, "directory", directory)
+
+	err = os.MkdirAll(directory, 0755)
 	if err != nil {
 		logger.Error(err, "Failed to create directory", "directory", directory)
 
@@ -64,20 +98,21 @@ func (g *GitImplementer) Clone(repoURL string, secretRef []byte, branch string, 
 	_, err = git.PlainClone(directory, false, &git.CloneOptions{
 		URL:           repoURL,
 		Auth:          auth,
-		ReferenceName: plumbing.ReferenceName(branch),
+		ReferenceName: plumbing.NewBranchReferenceName(branch),
 		Depth:         1,
 	})
 	if err != nil {
-		logger.Error(err, "Failed to clone repoURL", "repoURL", repoURL)
+		logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
 
 		return err
 	}
+	logger.Info("Successfully cloned git repository", "repoURL", repoURL, "directory", directory)
 
 	return err
 }
 
-// Poll polls for changes for the given remote git repoURLsitory. Returns true, if current local commit hash and remote hash are not equal.
-func (g *GitImplementer) Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error) {
+// Poll polls for changes for the given remote git repository. Returns true, if current local commit hash and remote hash are not equal.
+func (g *Implementer) Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error) {
 	// Defaults to false. We only change to true if there is a difference between the hashes.
 	changes = false
 
@@ -104,7 +139,7 @@ func (g *GitImplementer) Poll(repoURL string, secretRef []byte, branch string, d
 	return changes, err
 }
 
-func (g *GitImplementer) Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
+func (g *Implementer) Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
 	if isURL(repoURL) {
 		return g.remoteHash(repoURL, secretRef, branch, logger)
 	}
@@ -112,7 +147,7 @@ func (g *GitImplementer) Hash(repoURL string, secretRef []byte, branch string, l
 	return g.localHash(repoURL, logger)
 }
 
-func (g *GitImplementer) CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error) {
+func (g *Implementer) CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error) {
 	remoteRepo := git.NewRemote(nil, &config.RemoteConfig{
 		URLs: []string{repoURL},
 	})
@@ -198,6 +233,7 @@ func getAuth(repoURL string, secretRef []byte, logger logr.Logger) (auth transpo
 	return auth, err
 }
 
+// getURLType checks the kind of the given URL, and returns the type of the auth Method.
 func getURLType(repoURL string) authType {
 	if strings.HasPrefix(repoURL, "http://") || strings.HasPrefix(repoURL, "https://") {
 		return authTypeHTTP
@@ -217,7 +253,7 @@ func getURLType(repoURL string) authType {
 }
 
 // localHash retrieves the HEAD commit hash from a local repository.
-func (g *GitImplementer) localHash(path string, logger logr.Logger) (hash string, err error) {
+func (g *Implementer) localHash(path string, logger logr.Logger) (hash string, err error) {
 	localRepo, err := git.PlainOpen(path)
 	if err != nil {
 		logger.Error(err, "failed to open local repo")
@@ -236,7 +272,7 @@ func (g *GitImplementer) localHash(path string, logger logr.Logger) (hash string
 	return hash, err
 }
 
-func (g *GitImplementer) remoteHash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
+func (g *Implementer) remoteHash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
 	auth, err := getAuth(repoURL, secretRef, logger)
 	if err != nil {
 		return hash, err
@@ -279,4 +315,46 @@ func isURL(repoURL string) bool {
 	}
 
 	return false
+}
+
+func parseRepoURL(repoURL string, host string, allowNested bool) (owner string, repo string, err error) {
+	repoURL = strings.TrimSuffix(repoURL, ".git")
+
+	// HTTPS
+	httpsPrefix := fmt.Sprintf("https://%s/", host)
+	if strings.HasPrefix(repoURL, httpsPrefix) {
+		parts := strings.Split(strings.TrimPrefix(repoURL, httpsPrefix), "/")
+		if len(parts) >= 2 {
+			owner = parts[0]
+			if allowNested {
+				repo = strings.Join(parts[1:], "/")
+			} else {
+				repo = parts[1]
+			}
+
+			return owner, repo, nil
+		}
+	}
+
+	// SSH
+	sshPrefix := fmt.Sprintf("git@%s:", host)
+	if strings.HasPrefix(repoURL, sshPrefix) {
+		parts := strings.Split(strings.TrimPrefix(repoURL, sshPrefix), "/")
+		if len(parts) >= 2 {
+			owner = parts[0]
+			if allowNested {
+				repo = strings.Join(parts[1:], "/")
+			} else {
+				repo = parts[1]
+			}
+
+			return owner, repo, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("invalid %s URL: %s", host, repoURL)
+}
+
+func urlPathEscape(s string) string {
+	return strings.ReplaceAll(s, "/", "%2F")
 }

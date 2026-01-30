@@ -24,35 +24,29 @@ import (
 	gitoperator "github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/git"
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/resourcer"
 	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/synthesizer"
+	"github.com/eitco/cluster-api-addon-provider-cdk8s/controllers/utils"
 	"github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-)
-
-const (
-	Finalizer = "cdk8sappproxy.addons.cluster.x-k8s.io/finalizer"
 )
 
 type Reconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, options controller.Options) error {
+func (r *Reconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&addonsv1alpha1.Cdk8sAppProxy{}).
@@ -71,25 +65,22 @@ func (r *Reconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, opt
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controller ctrl.Result, err error) {
-	// logs := ctrl.LoggerFrom(ctx).WithValues("cdk8sappproxy", req.NamespacedName)
-	logger := log.FromContext(ctx).WithValues("cdk8sappproxy", req.NamespacedName)
-	logger.Info("Starting Reconciler")
+	logs := ctrl.LoggerFrom(ctx).WithValues("cdk8sappproxy", req.NamespacedName)
+	logs.Info("Reconciling CDk8sAppProxy")
 
-	gitImpl := &gitoperator.GitImplementer{}
 	synthImpl := &synthesizer.Implementer{}
 	resourcerImpl := &resourcer.Implementer{
 		Client: r.Client,
 	}
 	cdk8sAppProxy := &addonsv1alpha1.Cdk8sAppProxy{}
 
-	if err := r.Get(ctx, req.NamespacedName, cdk8sAppProxy); err != nil {
+	if err = r.Get(ctx, req.NamespacedName, cdk8sAppProxy); err != nil {
 		if apierrors.IsNotFound(err) {
-			logger.Error(err, "cdk8sAppProxy resource not found")
+			logs.Error(err, "cdk8sAppProxy resource not found")
 
 			return ctrl.Result{}, err
 		}
-
-		logger.Error(err, "Failed to get cdk8sAppProxy")
+		logs.Error(err, "Failed to get cdk8sAppProxy")
 
 		return ctrl.Result{}, err
 	}
@@ -97,47 +88,37 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	repoURL := cdk8sAppProxy.Spec.GitRepository.URL
 	branch := cdk8sAppProxy.Spec.GitRepository.Reference
 	directory := "/tmp/cdk8s-" + cdk8sAppProxy.Namespace + "-" + cdk8sAppProxy.Name + "-" + branch
-	secretKey := cdk8sAppProxy.Spec.GitRepository.SecretKey
-	secretName := cdk8sAppProxy.Spec.GitRepository.SecretRef
 
-	defer os.RemoveAll(directory)
-
-	var (
-		secretRef []byte
-		ok        bool
-	)
-
-	if secretName != "" {
-		namespacedSecretKey := types.NamespacedName{
-			Namespace: cdk8sAppProxy.Namespace,
-			Name:      secretName,
+	defer func(path string) {
+		err = os.RemoveAll(path)
+		if err != nil {
+			logs.Error(err, "Failed to clean-up directory", "path", path)
 		}
+	}(directory)
 
-		secret := &corev1.Secret{}
-		if err = r.Get(ctx, namespacedSecretKey, secret); err != nil {
-			logger.Error(err, "Error getting the Secret specified in SecretRef")
-
-			return ctrl.Result{}, err
-		}
-
-		secretRef, ok = secret.Data[secretKey]
-		if !ok {
-			logger.Error(err, "secret '%s' does not contain data key '%s'", secretName, secretKey)
-
-			return ctrl.Result{}, err
-		}
+	// Fetch secret for Git authentication if provided.
+	secretRef, err := utils.FetchSecret(ctx, r.Client, cdk8sAppProxy.Namespace, cdk8sAppProxy.Spec.GitRepository, logs)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
-	// Check access before (interface)Cloning
-	_, requiredAuth, err := gitImpl.CheckAccess(repoURL, secretRef, logger)
+	// Check access before Cloning
+	gitImpl := &gitoperator.Implementer{}
+	accessible, requiredAuth, err := gitImpl.CheckAccess(repoURL, secretRef, logs)
 	if err != nil {
-		logger.Error(err, "Failed to check repository access")
+		logs.Error(err, "Failed to check repository access")
 
 		return ctrl.Result{}, err
 	}
 
 	if requiredAuth && len(secretRef) == 0 {
-		logger.Error(err, "Repository requires authentication but no secretRef was provided.")
+		logs.Error(err, "Repository requires authentication but no secretRef was provided.")
+
+		return ctrl.Result{}, err
+	}
+
+	if !accessible {
+		logs.Error(err, "repository is not accessible. Access Denied")
 
 		return ctrl.Result{}, err
 	}
@@ -146,9 +127,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		secretRef = nil
 	}
 
-	err = gitImpl.Clone(repoURL, secretRef, branch, directory, logger)
+	err = gitImpl.Clone(repoURL, secretRef, branch, directory, logs)
 	if err != nil {
-		logger.Error(err, "Failed to clone git repository", "repoURL", repoURL, "directory", directory)
 		conditions.Set(cdk8sAppProxy, metav1.Condition{
 			Type:    clusterv1.AvailableCondition,
 			Status:  metav1.ConditionFalse,
@@ -159,9 +139,10 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		return ctrl.Result{}, err
 	}
 
-	parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logger, ctx)
+	logs.Info("Starting to synthesize resources", "directory", directory)
+	parsedResources, err := synthImpl.Synthesize(directory, cdk8sAppProxy, logs, ctx)
 	if err != nil {
-		logger.Error(err, "failed to synthesize resources")
+		logs.Error(err, "failed to synthesize resources")
 		conditions.Set(cdk8sAppProxy, metav1.Condition{
 			Type:    clusterv1.AvailableCondition,
 			Status:  metav1.ConditionFalse,
@@ -171,10 +152,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 
 		return ctrl.Result{}, err
 	}
+	logs.Info("Synthesized resources", "count", len(parsedResources))
 
-	err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logger)
+	err = resourcerImpl.Apply(ctx, cdk8sAppProxy, parsedResources, logs)
 	if err != nil {
-		logger.Error(err, "failed to apply resources")
+		logs.Error(err, "failed to apply resources")
 		conditions.Set(cdk8sAppProxy, metav1.Condition{
 			Type:    clusterv1.ReadyCondition,
 			Status:  metav1.ConditionFalse,
@@ -185,9 +167,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		return ctrl.Result{}, err
 	}
 
-	missingResource, err := resourcerImpl.Check(ctx, cdk8sAppProxy, parsedResources, logger)
+	missingResource, err := resourcerImpl.Check(ctx, cdk8sAppProxy, parsedResources, logs)
 	if err != nil {
-		logger.Error(err, "failed to check for resource existence")
+		logs.Error(err, "failed to check for resource existence")
 
 		return ctrl.Result{}, err
 	}
@@ -202,10 +184,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 	}
 
 	if err = r.Status().Update(ctx, cdk8sAppProxy); err != nil {
-		logger.Error(err, "failed to update cdk8sAppProxy status")
+		logs.Error(err, "failed to update cdk8sAppProxy status")
 
 		return ctrl.Result{}, err
 	}
+
+	logs.Info("Reconciliation finished successfully")
 
 	return ctrl.Result{}, err
 }
@@ -213,11 +197,11 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 // ClusterToCdk8sAppProxyMapper is a handler.ToRequestsFunc to be used to enqeue requests for Cdk8sAppProxyReconciler.
 // It maps CAPI Cluster events to Cdk8sAppProxy events.
 func (r *Reconciler) ClusterToCdk8sAppProxyMapper(ctx context.Context, o client.Object) (results []ctrl.Request) {
-	log := ctrl.LoggerFrom(ctx)
+	logs := ctrl.LoggerFrom(ctx)
 
 	cluster, ok := o.(*clusterv1.Cluster)
 	if !ok {
-		log.Error(errors.Errorf("expected a Cluster but got %T", o), "failed to map object to Cdk8sAppProxy")
+		logs.Error(errors.Errorf("expected a Cluster but got %T", o), "failed to map object to Cdk8sAppProxy")
 
 		return results
 	}
@@ -231,7 +215,7 @@ func (r *Reconciler) ClusterToCdk8sAppProxyMapper(ctx context.Context, o client.
 	for _, cdk8sAppProxy := range cdk8sappproxies.Items {
 		selector, err := metav1.LabelSelectorAsSelector(&cdk8sAppProxy.Spec.ClusterSelector)
 		if err != nil {
-			log.Error(err, "failed to parse ClusterSelector for Cdk8sAppProxy", "cdk8sAppProxy", cdk8sAppProxy.Name)
+			logs.Error(err, "failed to parse ClusterSelector for Cdk8sAppProxy", "cdk8sAppProxy", cdk8sAppProxy.Name)
 
 			return results
 		}

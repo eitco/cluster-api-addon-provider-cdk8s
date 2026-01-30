@@ -42,6 +42,5 @@ tmp/
 # Release Files
 out/
 
-*-cdk8sappproxy.yaml
 hack/ssh_known_hosts
-controllers/.reconciler-backup.md
+capg.yaml

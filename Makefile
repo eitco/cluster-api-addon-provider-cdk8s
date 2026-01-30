@@ -23,8 +23,7 @@ SHELL:=/usr/bin/env bash
 #
 # Go.
 #
-# GO_VERSION ?= $(shell cat go.mod | grep "toolchain" | { read _ v; echo "$${v#go}"; } | grep "[0-9]" || cat go.mod | grep "go " | head -1 | awk '{print $$2}')
-GO_VERSION ?= 1.25.6
+GO_VERSION ?= $(shell awk '/^toolchain/ { if ($$2 ~ /[0-9]/) { print substr($$2, 3); found=1; exit } } /^go / { v=$$2 } END { if (!found && v) print v }' go.mod)
 GO_BASE_CONTAINER ?= docker.io/library/golang
 GO_CONTAINER_IMAGE ?= $(GO_BASE_CONTAINER):$(GO_VERSION)
 
@@ -225,8 +224,8 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
-TAG ?= dev
-#TAG ?= v1.0.0-beta.3-8
+#TAG ?= dev
+TAG ?= v1.0.0-beta.4-10
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm64 ppc64le
 
@@ -323,8 +322,8 @@ generate-e2e-templates-v1.5: $(KUSTOMIZE)
 
 .PHONY: generate-e2e-templates-main
 generate-e2e-templates-main: $(KUSTOMIZE) ## Generate templates for e2e tests on main branch.
-	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template.yaml
-	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta1/cluster-template-upgrades --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta1/cluster-template-upgrades.yaml
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta2/cluster-template --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta2/cluster-template.yaml
+	$(KUSTOMIZE) build $(DOCKER_TEMPLATES)/v1beta2/cluster-template-upgrades --load-restrictor LoadRestrictionsNone > $(DOCKER_TEMPLATES)/v1beta2/cluster-template-upgrades.yaml
 
 .PHONY: generate-flavors
 generate-flavors: $(KUSTOMIZE)  ## Generate template flavors.

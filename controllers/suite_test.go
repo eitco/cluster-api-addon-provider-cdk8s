@@ -122,7 +122,7 @@ var _ = BeforeSuite(func() {
 	err = (&caapccontroller.Reconciler{
 		Client: k8sManager.GetClient(),
 		Scheme: k8sManager.GetScheme(),
-	}).SetupWithManager(ctx, k8sManager, controller.Options{})
+	}).SetupWithManager(k8sManager, controller.Options{})
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {

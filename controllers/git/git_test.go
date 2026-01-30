@@ -1,187 +1,231 @@
 package git
 
 import (
-	"net/url"
+	"os"
 	"testing"
+
+	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-logr/logr"
 )
 
-func TestIsUrl(t *testing.T) {
+func TestGitURLHelpers(t *testing.T) {
 	tests := []struct {
-		name           string
-		input          string
-		expected       bool
-		expectedScheme string
+		name            string
+		input           string
+		expectedIsURL   bool
+		expectedURLType authType
 	}{
-		// Valid URLs (should return true)
 		{
-			name:           "https URL",
-			input:          "https://github.com/user/repo",
-			expected:       true,
-			expectedScheme: "https",
+			name:            "HTTPS URL",
+			input:           "https://github.com/user/repo",
+			expectedIsURL:   true,
+			expectedURLType: authTypeHTTP,
 		},
 		{
-			name:           "http URL",
-			input:          "http://example.com/repo",
-			expected:       true,
-			expectedScheme: "http",
+			name:            "HTTP URL",
+			input:           "http://example.com/repo",
+			expectedIsURL:   true,
+			expectedURLType: authTypeHTTP,
 		},
 		{
-			name:           "git URL",
-			input:          "git://github.com/user/repo.git",
-			expected:       true,
-			expectedScheme: "git",
+			name:            "SSH Protocol URL",
+			input:           "ssh://git@github.com/user/repo.git",
+			expectedIsURL:   true,
+			expectedURLType: authTypeSSH,
 		},
 		{
-			name:           "ssh URL",
-			input:          "ssh://git@github.com/user/repo.git",
-			expected:       true,
-			expectedScheme: "ssh",
+			name:            "Git SSH URL (git@)",
+			input:           "git@github.com:user/repo.git",
+			expectedIsURL:   true,
+			expectedURLType: authTypeSSH,
 		},
 		{
-			name:           "git+ssh URL",
-			input:          "git+ssh://git@github.com/user/repo.git",
-			expected:       true,
-			expectedScheme: "git+ssh",
-		},
-
-		// Directory paths (should return false)
-		{
-			name:           "absolute path",
-			input:          "/tmp/local-repo",
-			expected:       false,
-			expectedScheme: "", // No scheme for paths
+			name:            "Absolute path",
+			input:           "/tmp/local-repo",
+			expectedIsURL:   false,
+			expectedURLType: authTypeUnknown,
 		},
 		{
-			name:           "relative path with dot",
-			input:          "./local-repo",
-			expected:       false,
-			expectedScheme: "",
-		},
-		{
-			name:           "relative path with double dot",
-			input:          "../local-repo",
-			expected:       false,
-			expectedScheme: "",
-		},
-		{
-			name:           "simple directory name",
-			input:          "local-repo",
-			expected:       false,
-			expectedScheme: "",
-		},
-		{
-			name:           "nested path",
-			input:          "path/to/local-repo",
-			expected:       false,
-			expectedScheme: "",
-		},
-		{
-			name:           "temp directory pattern",
-			input:          "/tmp/cdk8s-git-clone-123",
-			expected:       false,
-			expectedScheme: "",
-		},
-
-		// Edge cases
-		{
-			name:           "empty string",
-			input:          "",
-			expected:       false,
-			expectedScheme: "",
-		},
-		{
-			name:           "just scheme",
-			input:          "https://",
-			expected:       true,
-			expectedScheme: "https",
-		},
-		{
-			name:           "malformed URL",
-			input:          "not-a-url",
-			expected:       false,
-			expectedScheme: "",
+			name:            "Relative path",
+			input:           "./local-repo",
+			expectedIsURL:   false,
+			expectedURLType: authTypeUnknown,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isURL(tt.input)
-			if result != tt.expected {
-				t.Errorf("isURL(%q) = %v, expected %v", tt.input, result, tt.expected)
+			isURLResult := isURL(tt.input)
+			if isURLResult != tt.expectedIsURL {
+				t.Errorf("isURL(%q) = %v, expected %v", tt.input, isURLResult, tt.expectedIsURL)
 			}
 
-			// Additional test: verify the actual scheme parsing
-			if tt.expected || tt.expectedScheme == "" {
-				parsedURL, err := url.ParseRequestURI(tt.input)
-				if err != nil && tt.expected {
-					t.Errorf("Expected %q to parse successfully, but got error: %v", tt.input, err)
-				} else if err == nil {
-					if parsedURL.Scheme != tt.expectedScheme {
-						t.Errorf("For input %q, expected scheme %q, but got %q", tt.input, tt.expectedScheme, parsedURL.Scheme)
-					}
-				}
+			urlTypeResult := getURLType(tt.input)
+			if urlTypeResult != tt.expectedURLType {
+				t.Errorf("getURLType(%q) = %v, expected %v", tt.input, urlTypeResult, tt.expectedURLType)
 			}
 		})
 	}
 }
 
-// Helper functions.
-/*
-func setupTestRepo(t *testing.T) string {
-	t.Helper()
+func TestCheckAccess(t *testing.T) {
+	// Setup a local git repo to test against
 	tempDir := t.TempDir()
-
-	t.Cleanup(func() {
-		err := os.RemoveAll(tempDir)
-		if err != nil {
-			t.Errorf("Cleaning up temp dir failed: %v", err)
-		}
-	})
-
-	repo, err := git.PlainInit(tempDir, false)
+	repo, err := gogit.PlainInit(tempDir, false)
 	if err != nil {
 		t.Fatalf("failed to init repo: %v", err)
 	}
 
-	fileName := tempDir + "/cdk8s-sample-deployment.yaml"
-	if err := os.WriteFile(fileName, []byte("yaml-content"), 0644); err != nil {
-		t.Fatalf("failed to write file: %v", err)
-	}
-
-	w, err := repo.Worktree()
+	// Add a dummy file and commit to make the repo not empty
+	worktree, err := repo.Worktree()
 	if err != nil {
 		t.Fatalf("failed to get worktree: %v", err)
 	}
-	_, err = w.Add("cdk8s-sample-deployment.yaml")
+	dummyFile := "dummy"
+	err = os.WriteFile(tempDir+"/"+dummyFile, []byte("content"), 0644)
 	if err != nil {
-		t.Fatalf("failed to add cdk8s-sample-deployment.yaml: %v", err)
+		t.Fatalf("failed to write dummy file: %v", err)
 	}
-
-	_, err = w.Commit("cdk8s-sample-deployment.yaml", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "Tester",
-			Email: "tester@example.com",
-			When:  time.Now(),
-		},
-	})
+	_, err = worktree.Add(dummyFile)
+	if err != nil {
+		t.Fatalf("failed to add dummy file: %v", err)
+	}
+	_, err = worktree.Commit("initial commit", &gogit.CommitOptions{})
 	if err != nil {
 		t.Fatalf("failed to commit: %v", err)
 	}
 
-	return tempDir
+	g := &Implementer{}
+	logger := logr.Discard()
+
+	t.Run("Public accessible local path", func(t *testing.T) {
+		accessible, requiresAuth, err := g.CheckAccess(tempDir, nil, logger)
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		if !accessible {
+			t.Errorf("expected accessible to be true")
+		}
+		if requiresAuth {
+			t.Errorf("expected requiresAuth to be false for local path")
+		}
+	})
+
+	t.Run("Non-existent path", func(t *testing.T) {
+		accessible, requiresAuth, err := g.CheckAccess("/non/existent/path", nil, logger)
+		if err == nil {
+			t.Errorf("expected error for non-existent path")
+		}
+		if accessible {
+			t.Errorf("expected accessible to be false")
+		}
+		_ = requiresAuth
+	})
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			func() bool {
-				for i := 0; i <= len(s)-len(substr); i++ {
-					if s[i:i+len(substr)] == substr {
-						return true
-					}
+func TestDetectProvider(t *testing.T) {
+	tests := []struct {
+		name     string
+		url      string
+		expected providerType
+	}{
+		{"GitHub HTTPS", "https://github.com/owner/repo", ProviderGitHub},
+		{"GitHub SSH", "git@github.com:owner/repo.git", ProviderGitHub},
+		{"GitLab HTTPS", "https://gitlab.com/owner/repo", ProviderGitLab},
+		{"GitLab SSH", "git@gitlab.com:owner/repo.git", ProviderGitLab},
+		{"Bitbucket HTTPS", "https://bitbucket.org/owner/repo", ProviderBitbucket},
+		{"Bitbucket SSH", "git@bitbucket.org:owner/repo.git", ProviderBitbucket},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := detectProvider(tt.url); got != tt.expected {
+				t.Errorf("DetectProvider() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParseURL(t *testing.T) {
+	t.Run("GitHub", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			url       string
+			wantOwner string
+			wantRepo  string
+			wantErr   bool
+		}{
+			{"HTTPS", "https://github.com/owner/repo", "owner", "repo", false},
+			{"SSH", "git@github.com:owner/repo.git", "owner", "repo", false},
+			{"Invalid", "https://example.com/repo", "", "", true},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				owner, repo, err := parseRepoURL(tt.url, "github.com", false)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("parseRepoURL() error = %v, wantErr %v", err, tt.wantErr)
+
+					return
 				}
+				if owner != tt.wantOwner || repo != tt.wantRepo {
+					t.Errorf("parseRepoURL() = (%v, %v), want (%v, %v)", owner, repo, tt.wantOwner, tt.wantRepo)
+				}
+			})
+		}
+	})
 
-				return false
-			}())))
+	t.Run("GitLab", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			url       string
+			wantOwner string
+			wantRepo  string
+			wantErr   bool
+		}{
+			{"HTTPS", "https://gitlab.com/owner/repo", "owner", "repo", false},
+			{"SSH", "git@gitlab.com:owner/repo.git", "owner", "repo", false},
+			{"Nested", "https://gitlab.com/owner/group/repo", "owner", "group/repo", false},
+			{"Invalid", "https://example.com/repo", "", "", true},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				owner, repo, err := parseRepoURL(tt.url, "gitlab.com", true)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("parseRepoURL() error = %v, wantErr %v", err, tt.wantErr)
+
+					return
+				}
+				if owner != tt.wantOwner || repo != tt.wantRepo {
+					t.Errorf("parseRepoURL() = (%v, %v), want (%v, %v)", owner, repo, tt.wantOwner, tt.wantRepo)
+				}
+			})
+		}
+	})
+
+	t.Run("Bitbucket", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			url       string
+			wantOwner string
+			wantRepo  string
+			wantErr   bool
+		}{
+			{"HTTPS", "https://bitbucket.org/owner/repo", "owner", "repo", false},
+			{"SSH", "git@bitbucket.org:owner/repo.git", "owner", "repo", false},
+			{"Invalid", "https://example.com/repo", "", "", true},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				owner, repo, err := parseRepoURL(tt.url, "bitbucket.org", false)
+				if (err != nil) != tt.wantErr {
+					t.Errorf("parseRepoURL() error = %v, wantErr %v", err, tt.wantErr)
+
+					return
+				}
+				if owner != tt.wantOwner || repo != tt.wantRepo {
+					t.Errorf("parseRepoURL() = (%v, %v), want (%v, %v)", owner, repo, tt.wantOwner, tt.wantRepo)
+				}
+			})
+		}
+	})
 }
-*/

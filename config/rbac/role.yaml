@@ -16,6 +16,7 @@ rules:
   - addons.cluster.x-k8s.io
   resources:
   - cdk8sappproxies
+  - cdk8sappproxygenerators
   verbs:
   - create
   - delete
@@ -28,12 +29,14 @@ rules:
   - addons.cluster.x-k8s.io
   resources:
   - cdk8sappproxies/finalizers
+  - cdk8sappproxygenerators/finalizers
   verbs:
   - update
 - apiGroups:
   - addons.cluster.x-k8s.io
   resources:
   - cdk8sappproxies/status
+  - cdk8sappproxygenerators/status
   verbs:
   - get
   - patch

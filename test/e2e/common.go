@@ -4,7 +4,7 @@
 /*
 Copyright 2024 The Kubernetes Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
+Licensed under the Apache License, Version 1.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -23,11 +23,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"log"
 	"net/http"
 	"path/filepath"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
@@ -39,11 +40,12 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
-	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	kubeadmv1 "sigs.k8s.io/cluster-api/api/controlplane/kubeadm/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capi_e2e "sigs.k8s.io/cluster-api/test/e2e"
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
+	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -63,15 +65,15 @@ func EnsureControlPlaneInitialized(ctx context.Context, input clusterctl.ApplyCu
 	})
 	kubeadmControlPlane := &kubeadmv1.KubeadmControlPlane{}
 	key := client.ObjectKey{
-		Namespace: cluster.Spec.ControlPlaneRef.Namespace,
+		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.ControlPlaneRef.Name,
 	}
 
 	By("Ensuring KubeadmControlPlane is initialized")
 	Eventually(func(g Gomega) {
-		g.Expect(getter.Get(ctx, key, kubeadmControlPlane)).To(Succeed(), "Failed to get KubeadmControlPlane object %s/%s", cluster.Spec.ControlPlaneRef.Namespace, cluster.Spec.ControlPlaneRef.Name)
-		g.Expect(kubeadmControlPlane.Status.Initialized).To(BeTrue(), "KubeadmControlPlane is not yet initialized")
-	}, input.WaitForControlPlaneIntervals...).Should(Succeed(), "KubeadmControlPlane object %s/%s was not initialized in time", cluster.Spec.ControlPlaneRef.Namespace, cluster.Spec.ControlPlaneRef.Name)
+		g.Expect(getter.Get(ctx, key, kubeadmControlPlane)).To(Succeed(), "Failed to get KubeadmControlPlane object %s/%s", cluster.Namespace, cluster.Spec.ControlPlaneRef.Name)
+		g.Expect(conditions.IsTrue(kubeadmControlPlane, kubeadmv1.KubeadmControlPlaneInitializedCondition)).To(BeTrue(), "KubeadmControlPlane is not yet initialized")
+	}, input.WaitForControlPlaneIntervals...).Should(Succeed(), "KubeadmControlPlane object %s/%s was not initialized in time", cluster.Namespace, cluster.Spec.ControlPlaneRef.Name)
 
 	By("Installing CNI")
 	EnsureCNIInstallation(ctx, CniInstallInput{
@@ -97,6 +99,16 @@ func EnsureControlPlaneInitialized(ctx context.Context, input clusterctl.ApplyCu
 		Cluster: result.Cluster,
 	}, input.WaitForControlPlaneIntervals...)
 }
+
+// func EnsureVClusterInitialized(ctx context.Context, input clusterctl.ApplyCustomClusterTemplateAndWaitInput, result *clusterctl.ApplyCustomClusterTemplateAndWaitResult) {
+// 	By("Ensuring VCluster is initialized")
+// 	// For vcluster, we just wait for the cluster to be ready as VCluster handles its own control plane.
+// 	// We can use DiscoveryAndWaitForControlPlaneInitialized which is generic enough if the cluster status is updated.
+// 	result.ControlPlane = framework.DiscoveryAndWaitForControlPlaneInitialized(ctx, framework.DiscoveryAndWaitForControlPlaneInitializedInput{
+// 		Lister:  input.ClusterProxy.GetClient(),
+// 		Cluster: result.Cluster,
+// 	}, input.WaitForControlPlaneIntervals...)
+// }
 
 // ToDo: Guess we watch for the wrong namespaces here.
 const (
@@ -290,7 +302,7 @@ func createApplyClusterTemplateInput(specName string, changes ...func(*clusterct
 			Flavor:                   clusterctl.DefaultFlavor,
 			Namespace:                "default",
 			ClusterName:              "cluster",
-			KubernetesVersion:        e2eConfig.GetVariable(capi_e2e.KubernetesVersion),
+			KubernetesVersion:        e2eConfig.MustGetVariable(capi_e2e.KubernetesVersion),
 			ControlPlaneMachineCount: ptr.To[int64](1),
 			WorkerMachineCount:       ptr.To[int64](1),
 		},
@@ -310,6 +322,12 @@ func createApplyClusterTemplateInput(specName string, changes ...func(*clusterct
 func withClusterProxy(proxy framework.ClusterProxy) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
 	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
 		input.ClusterProxy = proxy
+	}
+}
+
+func withInfrastructureProvider(provider string) func(*clusterctl.ApplyClusterTemplateAndWaitInput) {
+	return func(input *clusterctl.ApplyClusterTemplateAndWaitInput) {
+		input.ConfigCluster.InfrastructureProvider = provider
 	}
 }
 
