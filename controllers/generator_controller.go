@@ -39,8 +39,8 @@ import (
 // GeneratorReconciler reconciles a Cdk8sAppProxyGenerator object.
 type GeneratorReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder events.EventRecorder
+	Scheme     *runtime.Scheme
+	Recorder   events.EventRecorder
 }
 
 // SetupWithManager sets up the controller with the Manager.

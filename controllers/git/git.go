@@ -5,6 +5,8 @@ to do various git operations.
 package git
 
 import (
+	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"strings"
@@ -18,7 +20,11 @@ import (
 	"github.com/go-logr/logr"
 )
 
-type authType string
+type (
+	authType string
+	// Provider represents a Git provider type.
+	providerType string
+)
 
 const (
 	// authTypeUnknown indicates we can't determine the auth type from the URL.
@@ -27,7 +33,29 @@ const (
 	authTypeSSH authType = "ssh"
 	// authTypeHTTP indicates the URL is for HTTP/S authentication.
 	authTypeHTTP authType = "http"
+	// ProviderGitHub defines the Provider type of GitHub.
+	ProviderGitHub providerType = "github"
+	// ProviderGitLab defines the Provider type of GitLab.
+	ProviderGitLab providerType = "gitlab"
+	// ProviderBitbucket defines the Provider type of BitBucket.
+	ProviderBitbucket providerType = "bitbucket"
 )
+
+type PullRequest struct {
+	ID         int    `json:"id"`
+	Number     int    `json:"number"`
+	Branch     string `json:"branch"`
+	HeadSHA    string `json:"head_sha"`
+	BaseBranch string `json:"base_branch"`
+}
+
+// Client implements the ProviderClient interface for various Git providers.
+type Client struct {
+	httpClientContainer
+	provider    providerType
+	host        string
+	allowNested bool
+}
 
 // Operator defines the interface for git operations.
 type Operator interface {
@@ -35,6 +63,11 @@ type Operator interface {
 	Poll(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (changes bool, err error)
 	Hash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error)
 	CheckAccess(repoURL string, secretRef []byte, logger logr.Logger) (accessible bool, requiresAuth bool, err error)
+	ListPullRequests(ctx context.Context, repoURL string, secretRef []byte) (prs []PullRequest, err error)
+}
+
+type ProviderClient interface {
+	ListPullRequests(ctx context.Context, repoURL string, secretRef []byte) (prs []PullRequest, err error)
 }
 
 // Implementer implements the GitOperator interface.
@@ -282,4 +315,46 @@ func isURL(repoURL string) bool {
 	}
 
 	return false
+}
+
+func parseRepoURL(repoURL string, host string, allowNested bool) (owner string, repo string, err error) {
+	repoURL = strings.TrimSuffix(repoURL, ".git")
+
+	// HTTPS
+	httpsPrefix := fmt.Sprintf("https://%s/", host)
+	if strings.HasPrefix(repoURL, httpsPrefix) {
+		parts := strings.Split(strings.TrimPrefix(repoURL, httpsPrefix), "/")
+		if len(parts) >= 2 {
+			owner = parts[0]
+			if allowNested {
+				repo = strings.Join(parts[1:], "/")
+			} else {
+				repo = parts[1]
+			}
+
+			return owner, repo, nil
+		}
+	}
+
+	// SSH
+	sshPrefix := fmt.Sprintf("git@%s:", host)
+	if strings.HasPrefix(repoURL, sshPrefix) {
+		parts := strings.Split(strings.TrimPrefix(repoURL, sshPrefix), "/")
+		if len(parts) >= 2 {
+			owner = parts[0]
+			if allowNested {
+				repo = strings.Join(parts[1:], "/")
+			} else {
+				repo = parts[1]
+			}
+
+			return owner, repo, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("invalid %s URL: %s", host, repoURL)
+}
+
+func urlPathEscape(s string) string {
+	return strings.ReplaceAll(s, "/", "%2F")
 }

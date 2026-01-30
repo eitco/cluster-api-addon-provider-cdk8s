@@ -24,120 +24,6 @@ import (
 	"strings"
 )
 
-// Provider represents a Git provider type.
-type Provider string
-
-const (
-	ProviderGitHub    Provider = "github"
-	ProviderGitLab    Provider = "gitlab"
-	ProviderBitbucket Provider = "bitbucket"
-)
-
-// PullRequest represents a pull request from a Git provider.
-type PullRequest struct {
-	ID         int    `json:"id"`
-	Number     int    `json:"number"`
-	Branch     string `json:"branch"`
-	HeadSHA    string `json:"head_sha"`
-	BaseBranch string `json:"base_branch"`
-}
-
-// ProviderClient defines the interface for Git provider operations.
-type ProviderClient interface {
-	ListPullRequests(ctx context.Context, repoURL string, secretRef []byte) (prs []PullRequest, err error)
-}
-
-// NewProviderClient returns the appropriate ProviderClient for the given repoURL.
-func NewProviderClient(repoURL string, httpClient *http.Client) (client ProviderClient, err error) {
-	provider := DetectProvider(repoURL)
-
-	host := ""
-	allowNested := false
-	switch provider {
-	case ProviderGitHub:
-		host = "github.com"
-	case ProviderGitLab:
-		host = "gitlab.com"
-		allowNested = true
-	case ProviderBitbucket:
-		host = "bitbucket.org"
-	}
-
-	return &Client{
-		httpClientContainer: httpClientContainer{httpClient: httpClient},
-		provider:            provider,
-		host:                host,
-		allowNested:         allowNested,
-	}, nil
-}
-
-// httpClientContainer provides common HTTP client access.
-type httpClientContainer struct {
-	httpClient *http.Client
-}
-
-func (h *httpClientContainer) getHTTPClient() *http.Client {
-	if h.httpClient == nil {
-		return http.DefaultClient
-	}
-
-	return h.httpClient
-}
-
-func (h *httpClientContainer) doJSONRequest(ctx context.Context, apiURL string, headers map[string]string, target any) (err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
-	if err != nil {
-		fmt.Println("replace me")
-
-		return err
-	}
-
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-
-	resp, err := h.getHTTPClient().Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to execute request: %w", err)	
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return nil
-}
-
-// DetectProvider determines the Git provider based on the repository URL.
-func DetectProvider(repoURL string) (provider Provider) {
-	repoURL = strings.ToLower(repoURL)
-	if strings.Contains(repoURL, "github.com") {
-		return ProviderGitHub
-	}
-	if strings.Contains(repoURL, "gitlab.com") {
-		return ProviderGitLab
-	}
-	if strings.Contains(repoURL, "bitbucket.org") {
-		return ProviderBitbucket
-	}
-
-	return provider
-}
-
-// Client implements the ProviderClient interface for various Git providers.
-type Client struct {
-	httpClientContainer
-	provider    Provider
-	host        string
-	allowNested bool
-}
-
 // ListPullRequests lists open pull requests for the repository.
 func (c *Client) ListPullRequests(ctx context.Context, repoURL string, secretRef []byte) (prs []PullRequest, err error) {
 	owner, repo, err := parseRepoURL(repoURL, c.host, c.allowNested)
@@ -178,6 +64,50 @@ func (c *Client) ListPullRequests(ctx context.Context, repoURL string, secretRef
 	default:
 		return nil, fmt.Errorf("unsupported Git provider: %s", c.provider)
 	}
+}
+
+
+func (c *Client) doJSONRequest(ctx context.Context, apiURL string, headers map[string]string, target any) (err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		fmt.Println("replace me")
+
+		return err
+	}
+
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := c.getHTTPClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return nil
+}
+
+// httpClientContainer provides common HTTP client access.
+type httpClientContainer struct {
+	httpClient *http.Client
+}
+
+func (h *httpClientContainer) getHTTPClient() *http.Client {
+	if h.httpClient == nil {
+		return http.DefaultClient
+	}
+
+	return h.httpClient
 }
 
 func (c *Client) fetchGitHubPRs(ctx context.Context, apiURL string, headers map[string]string) (prs []PullRequest, err error) {
@@ -271,44 +201,43 @@ func (c *Client) fetchBitbucketPRs(ctx context.Context, apiURL string, headers m
 	return prs, nil
 }
 
-func parseRepoURL(repoURL string, host string, allowNested bool) (owner string, repo string, err error) {
-	repoURL = strings.TrimSuffix(repoURL, ".git")
+// NewProviderClient returns the appropriate ProviderClient for the given repoURL.
+func NewProviderClient(repoURL string, httpClient *http.Client) (client ProviderClient, err error) {
+	provider := detectProvider(repoURL)
 
-	// HTTPS
-	httpsPrefix := fmt.Sprintf("https://%s/", host)
-	if strings.HasPrefix(repoURL, httpsPrefix) {
-		parts := strings.Split(strings.TrimPrefix(repoURL, httpsPrefix), "/")
-		if len(parts) >= 2 {
-			owner = parts[0]
-			if allowNested {
-				repo = strings.Join(parts[1:], "/")
-			} else {
-				repo = parts[1]
-			}
-
-			return owner, repo, nil
-		}
+	host := ""
+	allowNested := false
+	switch provider {
+	case ProviderGitHub:
+		host = "github.com"
+	case ProviderGitLab:
+		host = "gitlab.com"
+		allowNested = true
+	case ProviderBitbucket:
+		host = "bitbucket.org"
 	}
 
-	// SSH
-	sshPrefix := fmt.Sprintf("git@%s:", host)
-	if strings.HasPrefix(repoURL, sshPrefix) {
-		parts := strings.Split(strings.TrimPrefix(repoURL, sshPrefix), "/")
-		if len(parts) >= 2 {
-			owner = parts[0]
-			if allowNested {
-				repo = strings.Join(parts[1:], "/")
-			} else {
-				repo = parts[1]
-			}
+	return &Client{
+		httpClientContainer: httpClientContainer{httpClient: httpClient},
+		provider:            provider,
+		host:                host,
+		allowNested:         allowNested,
+	}, err
+}
 
-			return owner, repo, nil
-		}
+// detectProvider determines the Git provider based on the repository URL.
+func detectProvider(repoURL string) (provider providerType) {
+	repoURL = strings.ToLower(repoURL)
+	if strings.Contains(repoURL, "github.com") {
+		return ProviderGitHub
+	}
+	if strings.Contains(repoURL, "gitlab.com") {
+		return ProviderGitLab
+	}
+	if strings.Contains(repoURL, "bitbucket.org") {
+		return ProviderBitbucket
 	}
 
-	return "", "", fmt.Errorf("invalid %s URL: %s", host, repoURL)
+	return provider
 }
 
-func urlPathEscape(s string) string {
-	return strings.ReplaceAll(s, "/", "%2F")
-}

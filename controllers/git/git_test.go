@@ -127,7 +127,7 @@ func TestDetectProvider(t *testing.T) {
 	tests := []struct {
 		name     string
 		url      string
-		expected Provider
+		expected providerType
 	}{
 		{"GitHub HTTPS", "https://github.com/owner/repo", ProviderGitHub},
 		{"GitHub SSH", "git@github.com:owner/repo.git", ProviderGitHub},
@@ -139,7 +139,7 @@ func TestDetectProvider(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := DetectProvider(tt.url); got != tt.expected {
+			if got := detectProvider(tt.url); got != tt.expected {
 				t.Errorf("DetectProvider() = %v, want %v", got, tt.expected)
 			}
 		})
