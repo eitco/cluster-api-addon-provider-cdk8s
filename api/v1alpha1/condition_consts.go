@@ -16,12 +16,10 @@ limitations under the License.
 
 package v1alpha1
 
-import clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
-
 // Cdk8sAppProxy Conditions and Reasons.
 const (
 	// DeploymentProgressingCondition indicates that the cdk8s application deployment is progressing.
-	DeploymentProgressingCondition clusterv1.ConditionType = "DeploymentProgressing"
+	DeploymentProgressingCondition = "DeploymentProgressing"
 	// SynthCondition indicates that synthing the cdk8s code is progressing.
 	SynthCondition = "SynthProgressing"
 	// SynthFailedReason indicates that synthing the cdk8s code failed.

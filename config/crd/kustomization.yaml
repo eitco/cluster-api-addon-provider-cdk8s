@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
   - bases/addons.cluster.x-k8s.io_cdk8sappproxies.yaml
+  - bases/addons.cluster.x-k8s.io_cdk8sappproxygenerators.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

@@ -57,8 +57,11 @@ func (i *Implementer) Synthesize(directory string, cdk8sAppProxy *addonsv1alpha1
 
 	synth := exec.CommandContext(ctx, "cdk8s", "synth")
 	synth.Dir = apiPath
+	var stdout, stderr bytes.Buffer
+	synth.Stdout = &stdout
+	synth.Stderr = &stderr
 	if err := synth.Run(); err != nil {
-		logger.Error(err, "Failed to synth cdk8s application")
+		logger.Error(err, "Failed to synth cdk8s application", "stdout", stdout.String(), "stderr", stderr.String())
 
 		return parsedManifests, err
 	}

@@ -1,0 +1,32 @@
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  labels:
+    preview: vcluster
+  name: vcluster
+spec:
+  controlPlaneRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: VCluster
+    name: vcluster
+  infrastructureRef:
+    apiGroup: infrastructure.cluster.x-k8s.io
+    kind: VCluster
+    name: vcluster
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: VCluster
+metadata:
+  name: vcluster
+spec:
+  helmRelease:
+    chart:
+      name: vcluster
+      repo: https://charts.loft.sh
+      version: ""
+    values: |-
+      controlPlane:
+        coredns:
+          deployment:
+            image: 'docker.io/coredns/coredns:1.14.1'
