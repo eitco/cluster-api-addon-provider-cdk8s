@@ -2,7 +2,7 @@ module github.com/eitco/cluster-api-addon-provider-cdk8s/hack/tools
 
 go 1.26.0
 
-toolchain go1.26.3
+toolchain go1.26.4
 
 require (
 	github.com/hashicorp/go-multierror v1.1.1
