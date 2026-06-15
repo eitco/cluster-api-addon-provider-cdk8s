@@ -4,6 +4,10 @@ go 1.26.0
 
 toolchain go1.26.4
 
+replace sigs.k8s.io/cluster-api => ../../
+
+replace sigs.k8s.io/cluster-api/test => ../../test
+
 require (
 	github.com/hashicorp/go-multierror v1.1.1
 	sigs.k8s.io/cluster-api/hack/tools v0.0.0-20220202124422-fe7656c044e1
