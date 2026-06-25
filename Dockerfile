@@ -27,7 +27,7 @@ ARG TARGETPLATFORM
 
 WORKDIR /ssh
 
-RUN apk add --no-cache openssh=10.2_p1-r0 openssh-client=10.2_p1-r0
+RUN apk add --no-cache bash openssh=10.2_p1-r0 openssh-client=10.2_p1-r0
 
 COPY ./hack/update-ssh-known-hosts.sh ./
 
@@ -84,7 +84,7 @@ ARG curl_version
 ARG xz_version
 ARG tar_version
 
-RUN apk add --no-cache curl=8.17.0-r1 tar=1.35-r4 xz=5.8.2-r0
+RUN apk add --no-cache curl=8.19.0-r0 tar=1.35-r4 xz=5.8.3-r0
 RUN curl -fsSL -o go1.26.4.linux-${TARGETARCH}.tar.gz https://go.dev/dl/go1.26.4.linux-${TARGETARCH}.tar.gz \
     && tar -C /usr/local -xzf go1.26.4.linux-${TARGETARCH}.tar.gz \
     && rm go1.26.4.linux-${TARGETARCH}.tar.gz
