@@ -102,5 +102,5 @@ type Cdk8sAppProxyList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&Cdk8sAppProxy{}, &Cdk8sAppProxyList{})
+	objectTypes = append(objectTypes, &Cdk8sAppProxy{}, &Cdk8sAppProxyList{})
 }

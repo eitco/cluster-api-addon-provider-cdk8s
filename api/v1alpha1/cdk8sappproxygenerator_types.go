@@ -94,5 +94,5 @@ type Cdk8sAppProxyGeneratorList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&Cdk8sAppProxyGenerator{}, &Cdk8sAppProxyGeneratorList{})
+	objectTypes = append(objectTypes, &Cdk8sAppProxyGenerator{}, &Cdk8sAppProxyGeneratorList{})
 }

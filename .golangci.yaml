@@ -20,7 +20,7 @@ linters:
     - exhaustive
     - forcetypeassert
     - ginkgolinter
-    - goconst
+#    - goconst # Can be enabled once we have a good way of defininig multiple consts.
     - gocritic
     - gocyclo
     - godot

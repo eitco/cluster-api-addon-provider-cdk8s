@@ -132,7 +132,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		conditions.Set(cdk8sAppProxy, metav1.Condition{
 			Type:    clusterv1.AvailableCondition,
 			Status:  metav1.ConditionFalse,
-			Reason:  "Failed",
+			Reason:  metav1.StatusFailure,
 			Message: "Failed to clone Git Repository",
 		})
 
@@ -146,7 +146,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		conditions.Set(cdk8sAppProxy, metav1.Condition{
 			Type:    clusterv1.AvailableCondition,
 			Status:  metav1.ConditionFalse,
-			Reason:  "Failed",
+			Reason:  metav1.StatusFailure,
 			Message: "Failed to synth cdk8s code",
 		})
 
@@ -160,7 +160,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		conditions.Set(cdk8sAppProxy, metav1.Condition{
 			Type:    clusterv1.ReadyCondition,
 			Status:  metav1.ConditionFalse,
-			Reason:  "Failed",
+			Reason:  metav1.StatusFailure,
 			Message: "Failed to apply resources",
 		})
 
