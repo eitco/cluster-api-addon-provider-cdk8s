@@ -47,6 +47,12 @@ type GitRepositorySpec struct {
 	// SecretKey is the key within the SecretRef secret.
 	// +kubebuilder:validation:optional
 	SecretKey string `json:"secretKey,omitempty"`
+
+	// KnownHostsKey (optional) is the key within SecretRef holding the SSH known_hosts
+	// entry for the repository host. Required for self-hosted SSH servers whose host key
+	// is not baked into the controller image. Generate with: ssh-keyscan -p <port> <host>
+	// +kubebuilder:validation:optional
+	KnownHostsKey string `json:"knownHostsKey,omitempty"`
 }
 
 // Cdk8sAppProxySpec defines the desired state of Cdk8sAppProxy.

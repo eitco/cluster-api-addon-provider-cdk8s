@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -18,6 +19,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/go-logr/logr"
+	cryptossh "golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 type (
@@ -71,7 +74,12 @@ type ProviderClient interface {
 }
 
 // Implementer implements the GitOperator interface.
-type Implementer struct{}
+type Implementer struct {
+	// KnownHosts holds the SSH known_hosts entry used to verify the host key of the
+	// repository server. When empty, verification falls back to the controller's
+	// baked-in known_hosts files (e.g. /etc/ssh/ssh_known_hosts).
+	KnownHosts []byte
+}
 
 // Clone clones the given repository to a local directory.
 func (g *Implementer) Clone(repoURL string, secretRef []byte, branch string, directory string, logger logr.Logger) (err error) {
@@ -87,7 +95,7 @@ func (g *Implementer) Clone(repoURL string, secretRef []byte, branch string, dir
 	}
 
 	if secretRef != nil {
-		auth, err = getAuth(repoURL, secretRef, logger)
+		auth, err = getAuth(repoURL, secretRef, g.KnownHosts, logger)
 		if err != nil {
 			logger.Error(err, "Failed to run getAuth")
 
@@ -164,7 +172,7 @@ func (g *Implementer) CheckAccess(repoURL string, secretRef []byte, logger logr.
 		return accessible, requiresAuth, nil
 	}
 
-	auth, err := getAuth(repoURL, secretRef, logger)
+	auth, err := getAuth(repoURL, secretRef, g.KnownHosts, logger)
 	if err != nil {
 		logger.Error(err, "Failed to run getAuth")
 		accessible = false
@@ -188,15 +196,10 @@ func (g *Implementer) CheckAccess(repoURL string, secretRef []byte, logger logr.
 	return accessible, requiresAuth, err
 }
 
-func getAuth(repoURL string, secretRef []byte, logger logr.Logger) (auth transport.AuthMethod, err error) {
+func getAuth(repoURL string, secretRef []byte, knownHosts []byte, logger logr.Logger) (auth transport.AuthMethod, err error) {
 	if len(secretRef) == 0 {
+		err = fmt.Errorf("secret reference is empty")
 		logger.Error(err, "secretRef reference is empty")
-		// conditions.Set(cdk8sAppProxy, metav1.Condition{
-		// 		Type: clusterv1.AvailableCondition,
-		// 		Status: metav1.ConditionFalse,
-		// 		Reason: "Failed",
-		// 		Message: "Failed to clone Git Repository",
-		// 	})
 
 		return auth, err
 	}
@@ -214,23 +217,92 @@ func getAuth(repoURL string, secretRef []byte, logger logr.Logger) (auth transpo
 		return auth, err
 	case authTypeSSH:
 		logger.Info("Using SSH Key Auth for URL", "url", repoURL)
-		auth, err = ssh.NewPublicKeys("git", secretRef, "")
+		publicKeys, err := ssh.NewPublicKeys("git", secretRef, "")
 		if err != nil {
-			logger.Error(err, "Failed on process the SSH token for URL", "url", repoURL)
+			err = fmt.Errorf("failed to parse SSH private key from secret (expected an unencrypted PEM private key): %w", err)
+			logger.Error(err, "Failed to process the SSH private key for URL", "url", repoURL)
 
 			return auth, err
 		}
-	case authTypeUnknown:
-		logger.Info("unknown type")
 
+		callback, err := sshHostKeyCallback(knownHosts)
+		if err != nil {
+			logger.Error(err, "Failed to build SSH host key verification for URL", "url", repoURL)
+
+			return auth, err
+		}
+		publicKeys.HostKeyCallback = callback
+		auth = publicKeys
+	case authTypeUnknown:
 		fallthrough
 	default:
+		err = fmt.Errorf("unknown or unsupported URL scheme for auth: %s", repoURL)
 		logger.Error(err, "unknown or unsupported URL scheme for auth")
 
 		return auth, err
 	}
 
 	return auth, err
+}
+
+// sshHostKeyCallback builds an SSH host key verification callback. When knownHosts is
+// provided (e.g. from the repository's credential Secret), the server host key is verified
+// against it. Otherwise it falls back to the controller's baked-in known_hosts files so
+// public hosts such as github.com / gitlab.com continue to verify. An unknown or mismatched
+// host key always results in a verification error (fail-closed) — host key checking is never
+// silently disabled.
+func sshHostKeyCallback(knownHosts []byte) (cryptossh.HostKeyCallback, error) {
+	if len(knownHosts) > 0 {
+		file, err := os.CreateTemp("", "cdk8s-known-hosts-*")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create temporary known_hosts file: %w", err)
+		}
+		defer func(name string) {
+			err = os.Remove(name)
+			if err != nil {
+				fmt.Printf("Failed to remove temporary known_hosts file: %s", err)
+			}
+		}(file.Name())
+
+		if _, err = file.Write(knownHosts); err != nil {
+			err = file.Close()
+			if err != nil {
+				return nil, err
+			}
+
+			return nil, fmt.Errorf("failed to write known_hosts: %w", err)
+		}
+		if err = file.Close(); err != nil {
+			return nil, fmt.Errorf("failed to close known_hosts file: %w", err)
+		}
+
+		return knownhosts.New(file.Name())
+	}
+
+	files := defaultKnownHostsFiles()
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no known_hosts configured: set knownHostsKey in the credential secret to trust this host")
+	}
+
+	return knownhosts.New(files...)
+}
+
+// defaultKnownHostsFiles returns the existing known_hosts files baked into the controller
+// image / user environment, skipping any that are absent (knownhosts.New errors on missing files).
+func defaultKnownHostsFiles() []string {
+	candidates := []string{"/etc/ssh/ssh_known_hosts"}
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(home, ".ssh", "known_hosts"))
+	}
+
+	files := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			files = append(files, candidate)
+		}
+	}
+
+	return files
 }
 
 // getURLType checks the kind of the given URL, and returns the type of the auth Method.
@@ -273,7 +345,7 @@ func (g *Implementer) localHash(path string, logger logr.Logger) (hash string, e
 }
 
 func (g *Implementer) remoteHash(repoURL string, secretRef []byte, branch string, logger logr.Logger) (hash string, err error) {
-	auth, err := getAuth(repoURL, secretRef, logger)
+	auth, err := getAuth(repoURL, secretRef, g.KnownHosts, logger)
 	if err != nil {
 		return hash, err
 	}
@@ -318,41 +390,41 @@ func isURL(repoURL string) bool {
 }
 
 func parseRepoURL(repoURL string, host string, allowNested bool) (owner string, repo string, err error) {
-	repoURL = strings.TrimSuffix(repoURL, ".git")
+	trimmedRepoURL := strings.TrimSuffix(repoURL, ".git")
 
-	// HTTPS
-	httpsPrefix := fmt.Sprintf("https://%s/", host)
-	if strings.HasPrefix(repoURL, httpsPrefix) {
-		parts := strings.Split(strings.TrimPrefix(repoURL, httpsPrefix), "/")
-		if len(parts) >= 2 {
-			owner = parts[0]
-			if allowNested {
-				repo = strings.Join(parts[1:], "/")
-			} else {
-				repo = parts[1]
+	prefixes := []string{
+		fmt.Sprintf("https://%s/", host),
+		fmt.Sprintf("git@%s:", host),
+	}
+
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(trimmedRepoURL, prefix) {
+			repoPath := strings.TrimPrefix(trimmedRepoURL, prefix)
+
+			owner, repo, ok := parseRepoPath(repoPath, allowNested)
+			if ok {
+				return owner, repo, nil
 			}
-
-			return owner, repo, nil
 		}
 	}
 
-	// SSH
-	sshPrefix := fmt.Sprintf("git@%s:", host)
-	if strings.HasPrefix(repoURL, sshPrefix) {
-		parts := strings.Split(strings.TrimPrefix(repoURL, sshPrefix), "/")
-		if len(parts) >= 2 {
-			owner = parts[0]
-			if allowNested {
-				repo = strings.Join(parts[1:], "/")
-			} else {
-				repo = parts[1]
-			}
+	return "", "", fmt.Errorf("invalid %s URL: %s", host, trimmedRepoURL)
+}
 
-			return owner, repo, nil
-		}
+func parseRepoPath(repoPath string, allowNested bool) (owner string, repo string, ok bool) {
+	parts := strings.Split(repoPath, "/")
+	if len(parts) < 2 {
+		return "", "", false
 	}
 
-	return "", "", fmt.Errorf("invalid %s URL: %s", host, repoURL)
+	owner = parts[0]
+	if allowNested {
+		repo = strings.Join(parts[1:], "/")
+	} else {
+		repo = parts[1]
+	}
+
+	return owner, repo, true
 }
 
 func urlPathEscape(s string) string {

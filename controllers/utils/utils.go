@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 
 	addonsv1alpha1 "github.com/eitco/cluster-api-addon-provider-cdk8s/api/v1alpha1"
 	"github.com/go-logr/logr"
@@ -28,6 +29,7 @@ import (
 
 func FetchSecret(ctx context.Context, c client.Client, namespace string, spec *addonsv1alpha1.GitRepositorySpec, logs logr.Logger) (secretRef []byte, err error) {
 	if spec == nil || spec.SecretRef == "" {
+		err = fmt.Errorf("secret reference is empty")
 		logs.Error(err, "secret reference is empty")
 
 		return secretRef, err
@@ -47,11 +49,44 @@ func FetchSecret(ctx context.Context, c client.Client, namespace string, spec *a
 
 	secretRef, ok := secret.Data[spec.SecretKey]
 	if !ok {
-		logs.Error(err, "secret does not contain key", "secret", spec.SecretKey)
+		err = fmt.Errorf("secret %q does not contain key %q", spec.SecretRef, spec.SecretKey)
+		logs.Error(err, "secret does not contain key", "secret", spec.SecretRef, "key", spec.SecretKey)
 
 		return secretRef, err
 	}
 	logs.Info("found secret", "secret", spec.SecretRef, "with key", spec.SecretKey)
 
 	return secretRef, err
+}
+
+// FetchKnownHosts returns the SSH known_hosts entry stored under spec.KnownHostsKey within
+// the secret referenced by spec.SecretRef. It returns nil (and no error) when no known_hosts
+// key is configured, leaving host-key verification to the controller's baked-in known_hosts.
+func FetchKnownHosts(ctx context.Context, c client.Client, namespace string, spec *addonsv1alpha1.GitRepositorySpec, logs logr.Logger) (knownHosts []byte, err error) {
+	if spec == nil || spec.SecretRef == "" || spec.KnownHostsKey == "" {
+		return knownHosts, err
+	}
+
+	secret := &corev1.Secret{}
+	secretKey := types.NamespacedName{
+		Namespace: namespace,
+		Name:      spec.SecretRef,
+	}
+
+	if err = c.Get(ctx, secretKey, secret); err != nil {
+		logs.Error(err, "failed to get secret", "secret", spec.SecretRef)
+
+		return knownHosts, err
+	}
+
+	knownHosts, ok := secret.Data[spec.KnownHostsKey]
+	if !ok {
+		err = fmt.Errorf("secret %q does not contain known_hosts key %q", spec.SecretRef, spec.KnownHostsKey)
+		logs.Error(err, "secret does not contain known_hosts key", "secret", spec.SecretRef, "key", spec.KnownHostsKey)
+
+		return knownHosts, err
+	}
+	logs.Info("found known_hosts", "secret", spec.SecretRef, "with key", spec.KnownHostsKey)
+
+	return knownHosts, err
 }

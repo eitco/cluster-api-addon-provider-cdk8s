@@ -103,6 +103,12 @@ spec:
                 description: GitRepository specifies the Git repository for the cdk8s
                   app.
                 properties:
+                  knownHostsKey:
+                    description: |-
+                      KnownHostsKey (optional) is the key within SecretRef holding the SSH known_hosts
+                      entry for the repository host. Required for self-hosted SSH servers whose host key
+                      is not baked into the controller image. Generate with: ssh-keyscan -p <port> <host>
+                    type: string
                   path:
                     description: |-
                       Path (optional) is the path within the repository where the cdk8s application is located.

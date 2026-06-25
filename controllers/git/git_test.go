@@ -1,11 +1,15 @@
 package git
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"os"
 	"testing"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-logr/logr"
+	cryptossh "golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 func TestGitURLHelpers(t *testing.T) {
@@ -36,6 +40,20 @@ func TestGitURLHelpers(t *testing.T) {
 		{
 			name:            "Git SSH URL (git@)",
 			input:           "git@github.com:user/repo.git",
+			expectedIsURL:   true,
+			expectedURLType: authTypeSSH,
+		},
+		{
+			// Self-hosted Bitbucket Server / Data Center uses a custom SSH port (7999).
+			name:            "Bitbucket Server SSH URL with custom port",
+			input:           "ssh://git@git.eitco.de:7999/uvas/caapc-deployments.git",
+			expectedIsURL:   true,
+			expectedURLType: authTypeSSH,
+		},
+		{
+			// scp-style form against a self-hosted host (no scheme, no port).
+			name:            "Self-hosted Git SSH URL (git@host:path)",
+			input:           "git@git.eitco.de:uvas/caapc-deployments.git",
 			expectedIsURL:   true,
 			expectedURLType: authTypeSSH,
 		},
@@ -120,6 +138,73 @@ func TestCheckAccess(t *testing.T) {
 			t.Errorf("expected accessible to be false")
 		}
 		_ = requiresAuth
+	})
+}
+
+// fakeAddr is a net.Addr whose String() we control, so the host-key callback can be
+// exercised without performing DNS resolution against the real host.
+type fakeAddr struct {
+	network string
+	addr    string
+}
+
+func (a fakeAddr) Network() string { return a.network }
+func (a fakeAddr) String() string  { return a.addr }
+
+func newTestSigner(t *testing.T) cryptossh.Signer {
+	t.Helper()
+
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate host key: %v", err)
+	}
+	signer, err := cryptossh.NewSignerFromKey(priv)
+	if err != nil {
+		t.Fatalf("failed to create signer: %v", err)
+	}
+
+	return signer
+}
+
+// TestSSHHostKeyCallback verifies that the callback built from a known_hosts entry trusts
+// the matching host key, rejects a different key for the same host (MITM), and rejects a
+// host that is not present in known_hosts (fail-closed). This is the offline-testable core
+// of the Bitbucket Server (ssh://git@git.eitco.de:7999/...) clone fix; a live clone of the
+// remote is intentionally out of scope for unit tests (it needs network, real credentials
+// and the real server key).
+func TestSSHHostKeyCallback(t *testing.T) {
+	trustedSigner := newTestSigner(t)
+	otherSigner := newTestSigner(t)
+
+	const hostPort = "git.eitco.de:7999"
+	normalized := knownhosts.Normalize(hostPort) // -> [git.eitco.de]:7999
+	knownHosts := []byte(knownhosts.Line([]string{normalized}, trustedSigner.PublicKey()) + "\n")
+
+	callback, err := sshHostKeyCallback(knownHosts)
+	if err != nil {
+		t.Fatalf("sshHostKeyCallback returned error: %v", err)
+	}
+
+	remote := fakeAddr{network: "tcp", addr: hostPort}
+
+	t.Run("accepts trusted host key", func(t *testing.T) {
+		if err := callback(hostPort, remote, trustedSigner.PublicKey()); err != nil {
+			t.Errorf("expected trusted host key to be accepted, got: %v", err)
+		}
+	})
+
+	t.Run("rejects mismatched host key", func(t *testing.T) {
+		if err := callback(hostPort, remote, otherSigner.PublicKey()); err == nil {
+			t.Errorf("expected mismatched host key to be rejected, got nil")
+		}
+	})
+
+	t.Run("rejects unknown host", func(t *testing.T) {
+		const unknownHostPort = "other.example.com:22"
+		unknownRemote := fakeAddr{network: "tcp", addr: unknownHostPort}
+		if err := callback(unknownHostPort, unknownRemote, trustedSigner.PublicKey()); err == nil {
+			t.Errorf("expected unknown host to be rejected, got nil")
+		}
 	})
 }
 

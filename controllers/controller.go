@@ -102,8 +102,14 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (controlle
 		return ctrl.Result{}, err
 	}
 
+	// Fetch the optional known_hosts entry used to verify the SSH host key of self-hosted servers.
+	knownHosts, err := utils.FetchKnownHosts(ctx, r.Client, cdk8sAppProxy.Namespace, cdk8sAppProxy.Spec.GitRepository, logs)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Check access before Cloning
-	gitImpl := &gitoperator.Implementer{}
+	gitImpl := &gitoperator.Implementer{KnownHosts: knownHosts}
 	accessible, requiredAuth, err := gitImpl.CheckAccess(repoURL, secretRef, logs)
 	if err != nil {
 		logs.Error(err, "Failed to check repository access")
