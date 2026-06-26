@@ -3,10 +3,15 @@ package git
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
+	"strings"
 	"testing"
 
 	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	"github.com/go-logr/logr"
 	cryptossh "golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -204,6 +209,81 @@ func TestSSHHostKeyCallback(t *testing.T) {
 		unknownRemote := fakeAddr{network: "tcp", addr: unknownHostPort}
 		if err := callback(unknownHostPort, unknownRemote, trustedSigner.PublicKey()); err == nil {
 			t.Errorf("expected unknown host to be rejected, got nil")
+		}
+	})
+}
+
+// newTestPrivateKeyPEM mints a valid, unencrypted PEM private key for exercising the
+// credential/scheme validation in getAuth without embedding a real key in the test.
+func newTestPrivateKeyPEM(t *testing.T) []byte {
+	t.Helper()
+
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate private key: %v", err)
+	}
+	der, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		t.Fatalf("failed to marshal private key: %v", err)
+	}
+
+	return pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+}
+
+// TestGetAuthRejectsCredentialSchemeMismatch verifies getAuth fails fast with a clear error
+// when the credential in the secret does not match the auth method implied by the URL scheme.
+func TestGetAuthRejectsCredentialSchemeMismatch(t *testing.T) {
+	logger := logr.Discard()
+
+	t.Run("HTTPS URL with an SSH private key is rejected", func(t *testing.T) {
+		_, err := getAuth("https://github.com/owner/repo.git", newTestPrivateKeyPEM(t), nil, logger)
+		if err == nil {
+			t.Fatalf("expected an error when an SSH private key is used with an HTTPS URL, got nil")
+		}
+	})
+
+	t.Run("SSH URL with a personal access token is rejected", func(t *testing.T) {
+		_, err := getAuth("ssh://git@git.example.com:7999/owner/repo.git", []byte("ghp_exampletoken"), nil, logger)
+		if err == nil {
+			t.Fatalf("expected an error when a token is used with an SSH URL, got nil")
+		}
+		if !strings.Contains(err.Error(), "token") {
+			t.Errorf("expected error to mention a token/scheme mismatch, got: %v", err)
+		}
+	})
+}
+
+// TestGetAuthBuildsExpectedAuthMethod guards against false positives in the credential/scheme
+// validation: the matching credential for each URL scheme must still produce the right auth.
+func TestGetAuthBuildsExpectedAuthMethod(t *testing.T) {
+	logger := logr.Discard()
+
+	t.Run("HTTPS URL with a token yields HTTP basic auth", func(t *testing.T) {
+		auth, err := getAuth("https://github.com/owner/repo.git", []byte("ghp_exampletoken"), nil, logger)
+		if err != nil {
+			t.Fatalf("expected no error, got: %v", err)
+		}
+		basic, ok := auth.(*http.BasicAuth)
+		if !ok {
+			t.Fatalf("expected *http.BasicAuth, got %T", auth)
+		}
+		if basic.Password != "ghp_exampletoken" {
+			t.Errorf("expected the token to be used as the password, got %q", basic.Password)
+		}
+	})
+
+	t.Run("SSH URL with a private key yields SSH public-key auth", func(t *testing.T) {
+		signer := newTestSigner(t)
+		const hostPort = "git.example.com:7999"
+		normalized := knownhosts.Normalize(hostPort)
+		knownHosts := []byte(knownhosts.Line([]string{normalized}, signer.PublicKey()) + "\n")
+
+		auth, err := getAuth("ssh://git@git.example.com:7999/owner/repo.git", newTestPrivateKeyPEM(t), knownHosts, logger)
+		if err != nil {
+			t.Fatalf("expected no error, got: %v", err)
+		}
+		if _, ok := auth.(*ssh.PublicKeys); !ok {
+			t.Fatalf("expected *ssh.PublicKeys, got %T", auth)
 		}
 	})
 }

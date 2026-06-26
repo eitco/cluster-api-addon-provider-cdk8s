@@ -208,6 +208,12 @@ func getAuth(repoURL string, secretRef []byte, knownHosts []byte, logger logr.Lo
 
 	switch urlType {
 	case authTypeHTTP:
+		if looksLikePrivateKey(secretRef) {
+			err = fmt.Errorf("an SSH private key was supplied for HTTPS URL %q: HTTPS expects a personal access token; use an ssh:// or git@ URL for key-based auth", repoURL)
+			logger.Error(err, "credential does not match URL scheme", "url", repoURL)
+
+			return auth, err
+		}
 		logger.Info("Using HTTP Basic Auth (PAT) for URL", "url", repoURL)
 		auth = &http.BasicAuth{
 			Username: "oauth2",
@@ -216,6 +222,12 @@ func getAuth(repoURL string, secretRef []byte, knownHosts []byte, logger logr.Lo
 
 		return auth, err
 	case authTypeSSH:
+		if !looksLikePrivateKey(secretRef) {
+			err = fmt.Errorf("a personal access token was supplied for SSH URL %q: SSH expects an unencrypted PEM private key; use an https:// URL for token auth", repoURL)
+			logger.Error(err, "credential does not match URL scheme", "url", repoURL)
+
+			return auth, err
+		}
 		logger.Info("Using SSH Key Auth for URL", "url", repoURL)
 		publicKeys, err := ssh.NewPublicKeys("git", secretRef, "")
 		if err != nil {
@@ -303,6 +315,13 @@ func defaultKnownHostsFiles() []string {
 	}
 
 	return files
+}
+
+// looksLikePrivateKey reports whether secret appears to be a PEM-encoded private key. It is
+// used to catch credential/URL-scheme mismatches early (e.g. a private key supplied for an
+// HTTPS URL, which expects a personal access token).
+func looksLikePrivateKey(secret []byte) bool {
+	return strings.Contains(string(secret), "PRIVATE KEY-----")
 }
 
 // getURLType checks the kind of the given URL, and returns the type of the auth Method.
