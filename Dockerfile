@@ -85,9 +85,9 @@ ARG xz_version
 ARG tar_version
 
 RUN apk add --no-cache curl=8.19.0-r0 tar=1.35-r4 xz=5.8.3-r0
-RUN curl -fsSL -o go1.26.4.linux-${TARGETARCH}.tar.gz https://go.dev/dl/go1.26.4.linux-${TARGETARCH}.tar.gz \
-    && tar -C /usr/local -xzf go1.26.4.linux-${TARGETARCH}.tar.gz \
-    && rm go1.26.4.linux-${TARGETARCH}.tar.gz
+RUN curl -fsSL -o go${go_version}.linux-${TARGETARCH}.tar.gz https://go.dev/dl/go${go_version}.linux-${TARGETARCH}.tar.gz \
+    && tar -C /usr/local -xzf go${go_version}.linux-${TARGETARCH}.tar.gz \
+    && rm go${go_version}.linux-${TARGETARCH}.tar.gz
 
 # Production image
 FROM --platform=$TARGETPLATFORM ${deployment_base_image}:${deployment_base_image_tag}

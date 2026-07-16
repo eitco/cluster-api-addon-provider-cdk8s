@@ -17,13 +17,10 @@ jobs:
           - ""
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # tag=v7.0.0
-      - name: Calculate go version
-        id: vars
-        run: echo "go_version=1.26.4" >> $GITHUB_OUTPUT
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # tag=v7.0.0
         with:
-          go-version: ${{ steps.vars.outputs.go_version }}
+          go-version-file: go.mod
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # tag=v9.3.0
         with:

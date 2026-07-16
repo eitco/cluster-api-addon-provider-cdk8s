@@ -415,7 +415,7 @@ docker-build-%:
 
 .PHONY: docker-build
 docker-build: docker-pull-prerequisites ## Build the docker image for core controller manager
-	DOCKER_BUILDKIT=1 docker build --platform linux/$(ARCH) $(BUILD_CONTAINER_ADDITIONAL_ARGS) --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg deployment_base_image=$(DEPLOYMENT_BASE_IMAGE) --build-arg deployment_base_image_tag=$(DEPLOYMENT_BASE_IMAGE_TAG) --build-arg goproxy=$(GOPROXY) --build-arg goprivate=$(GOPRIVATE) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
+	DOCKER_BUILDKIT=1 docker build --platform linux/$(ARCH) $(BUILD_CONTAINER_ADDITIONAL_ARGS) --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg go_version=$(GO_VERSION) --build-arg deployment_base_image=$(DEPLOYMENT_BASE_IMAGE) --build-arg deployment_base_image_tag=$(DEPLOYMENT_BASE_IMAGE_TAG) --build-arg goproxy=$(GOPROXY) --build-arg goprivate=$(GOPRIVATE) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
 	$(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
 	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml"
 
