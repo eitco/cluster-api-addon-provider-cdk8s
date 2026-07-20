@@ -88,7 +88,6 @@ get_binaries() {
     freebsd/armv7) BINARIES="golangci-lint" ;;
     freebsd/mips64) BINARIES="golangci-lint" ;;
     freebsd/mips64le) BINARIES="golangci-lint" ;;
-    freebsd/ppc64le) BINARIES="golangci-lint" ;;
     freebsd/s390x) BINARIES="golangci-lint" ;;
     illumos/amd64) BINARIES="golangci-lint" ;;
     linux/386) BINARIES="golangci-lint" ;;
@@ -98,7 +97,6 @@ get_binaries() {
     linux/armv7) BINARIES="golangci-lint" ;;
     linux/mips64) BINARIES="golangci-lint" ;;
     linux/mips64le) BINARIES="golangci-lint" ;;
-    linux/ppc64le) BINARIES="golangci-lint" ;;
     linux/s390x) BINARIES="golangci-lint" ;;
     linux/riscv64) BINARIES="golangci-lint" ;;
     linux/loong64) BINARIES="golangci-lint" ;;
@@ -113,7 +111,6 @@ get_binaries() {
     windows/armv7) BINARIES="golangci-lint" ;;
     windows/mips64) BINARIES="golangci-lint" ;;
     windows/mips64le) BINARIES="golangci-lint" ;;
-    windows/ppc64le) BINARIES="golangci-lint" ;;
     windows/s390x) BINARIES="golangci-lint" ;;
     *)
       log_crit "platform $PLATFORM is not supported.  Make sure this script is up-to-date and file request at https://github.com/${PREFIX}/issues/new"
@@ -262,7 +259,6 @@ uname_arch_check() {
     armv6) return 0 ;;
     armv7) return 0 ;;
     ppc64) return 0 ;;
-    ppc64le) return 0 ;;
     mips) return 0 ;;
     mipsle) return 0 ;;
     mips64) return 0 ;;

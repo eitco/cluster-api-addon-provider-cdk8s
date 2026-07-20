@@ -48,8 +48,8 @@ DEPLOYMENT_BASE_IMAGE_TAG ?= 3.23.2
 BUILD_CONTAINER_ADDITIONAL_ARGS ?=
 
 # APK Version for Docker builds
-NODEJS_VERSION ?= 24.13.0-r1
-NPM_VERSION ?= 11.6.3-r0
+NODEJS_VERSION ?= 24.17.0-r0
+NPM_VERSION ?= 11.11.0-r0
 CDK8S_VERSION ?= 2.203.18
 
 #
@@ -225,9 +225,9 @@ CAPI_KIND_CLUSTER_NAME ?= capi-test
 # It is set by Prow GIT_TAG, a git-based tag of the form vYYYYMMDD-hash, e.g., v20210120-v0.3.10-308-gc61521971
 
 #TAG ?= dev
-TAG ?= v1.0.0
+TAG ?= v1.0.1
 ARCH ?= $(shell go env GOARCH)
-ALL_ARCH = amd64 arm64 ppc64le
+ALL_ARCH = amd64 arm64
 
 # Allow overriding manifest generation destination directory
 MANIFEST_ROOT ?= config
@@ -415,7 +415,7 @@ docker-build-%:
 
 .PHONY: docker-build
 docker-build: docker-pull-prerequisites ## Build the docker image for core controller manager
-	DOCKER_BUILDKIT=1 docker build --platform linux/$(ARCH) $(BUILD_CONTAINER_ADDITIONAL_ARGS) --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg go_version=$(GO_VERSION) --build-arg deployment_base_image=$(DEPLOYMENT_BASE_IMAGE) --build-arg deployment_base_image_tag=$(DEPLOYMENT_BASE_IMAGE_TAG) --build-arg goproxy=$(GOPROXY) --build-arg goprivate=$(GOPRIVATE) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
+	DOCKER_BUILDKIT=1 docker build --provenance=false --sbom=false --platform linux/$(ARCH) $(BUILD_CONTAINER_ADDITIONAL_ARGS) --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg go_version=$(GO_VERSION) --build-arg nodejs_version=$(NODEJS_VERSION) --build-arg npm_version=$(NPM_VERSION) --build-arg cdk8s_version=$(CDK8S_VERSION) --build-arg deployment_base_image=$(DEPLOYMENT_BASE_IMAGE) --build-arg deployment_base_image_tag=$(DEPLOYMENT_BASE_IMAGE_TAG) --build-arg goproxy=$(GOPROXY) --build-arg goprivate=$(GOPRIVATE) --build-arg ARCH=$(ARCH) --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
 	$(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
 	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml"
 

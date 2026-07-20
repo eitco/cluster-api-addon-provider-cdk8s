@@ -84,7 +84,7 @@ ARG curl_version
 ARG xz_version
 ARG tar_version
 
-RUN apk add --no-cache curl=8.19.0-r0 tar=1.35-r4 xz=5.8.3-r0
+RUN apk add --no-cache curl=8.20.0-r0 tar=1.35-r4 xz=5.8.3-r0
 RUN curl -fsSL -o go${go_version}.linux-${TARGETARCH}.tar.gz https://go.dev/dl/go${go_version}.linux-${TARGETARCH}.tar.gz \
     && tar -C /usr/local -xzf go${go_version}.linux-${TARGETARCH}.tar.gz \
     && rm go${go_version}.linux-${TARGETARCH}.tar.gz
@@ -92,11 +92,14 @@ RUN curl -fsSL -o go${go_version}.linux-${TARGETARCH}.tar.gz https://go.dev/dl/g
 # Production image
 FROM --platform=$TARGETPLATFORM ${deployment_base_image}:${deployment_base_image_tag}
 ARG TARGETPLATFORM
+ARG nodejs_version
+ARG npm_version
+ARG cdk8s_version
 
 WORKDIR /
 
-RUN apk add --no-cache nodejs=24.13.0-r1 npm=11.6.3-r0 \
-    && npm install -g cdk8s-cli@2.203.18 \
+RUN apk add --no-cache nodejs=${nodejs_version} npm=${npm_version} \
+    && npm install -g cdk8s-cli@${cdk8s_version} \
     && npm cache clean --force
 
 COPY --from=go_runtime_builder /usr/local/go /usr/local/go

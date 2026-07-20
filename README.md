@@ -71,7 +71,7 @@ Examples of `Cdk8sAppProxy` usage can be found in the `/examples` directory in t
 
 ### Supported Platforms:
 
-`amd64 arm64 ppc64le`
+`amd64 arm64`
 
 `s390` and `arm` is currently not supported.
 
