@@ -204,8 +204,9 @@ RUNTIME_OPENAPI_GEN := $(abspath $(TOOLS_BIN_DIR)/$(RUNTIME_OPENAPI_GEN_BIN))
 TILT_PREPARE_BIN := tilt-prepare
 TILT_PREPARE := $(abspath $(TOOLS_BIN_DIR)/$(TILT_PREPARE_BIN))
 
+GOLANGCI_LINT_VER := v2.13.1
 GOLANGCI_LINT_BIN := golangci-lint
-GOLANGCI_LINT := $(abspath $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN))
+GOLANGCI_LINT := $(abspath $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN)-$(GOLANGCI_LINT_VER))
 
 # If REGISTRY is not set, default to localhost:5000 to use the kind registry.
 ifndef REGISTRY
@@ -834,10 +835,11 @@ $(RELEASE_NOTES): ## Build release notes from tools folder.
 $(YQ):
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(YQ_PKG) $(YQ_BIN) ${YQ_VER}
 
-$(GOLANGCI_LINT): .github/workflows/golangci-lint.yml # Download golangci-lint using hack script into tools folder.
+$(GOLANGCI_LINT): # Download golangci-lint using hack script into tools folder.
 	hack/ensure-golangci-lint.sh \
 		-b $(TOOLS_BIN_DIR) \
-		$(shell yq e '.jobs.golangci.steps[] | select(.name? == "golangci-lint") | .with.version' .github/workflows/golangci-lint.yml )
+		$(GOLANGCI_LINT_VER)
+	mv $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN) $@
 
 $(GINKGO): # Build ginkgo from tools folder.
 	GOBIN=$(TOOLS_BIN_DIR) $(GO_INSTALL) $(GINKGO_PKG) $(GINKGO_BIN) $(GINGKO_VER)

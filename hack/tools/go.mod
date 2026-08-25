@@ -2,7 +2,7 @@ module github.com/eitco/cluster-api-addon-provider-cdk8s/hack/tools
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.6
 
 replace sigs.k8s.io/cluster-api => ../../
 
