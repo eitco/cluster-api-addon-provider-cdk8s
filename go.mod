@@ -6,16 +6,16 @@ require (
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/go-logr/logr v1.4.4
 	github.com/onsi/ginkgo/v2 v2.32.1
-	github.com/onsi/gomega v1.42.1
+	github.com/onsi/gomega v1.43.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.70.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.55.0
-	k8s.io/api v0.36.4
+	k8s.io/api v0.37.0
 	k8s.io/apimachinery v0.37.0
-	k8s.io/client-go v0.36.4
+	k8s.io/client-go v0.37.0
 	k8s.io/component-base v0.36.4
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
