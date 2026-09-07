@@ -22,7 +22,7 @@ require (
 	sigs.k8s.io/cluster-api v1.14.0
 	sigs.k8s.io/cluster-api/api v1.14.0
 	sigs.k8s.io/cluster-api/test v1.14.0
-	sigs.k8s.io/controller-runtime v0.24.1
+	sigs.k8s.io/controller-runtime v0.25.0
 )
 
 require (
@@ -169,8 +169,8 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	k8s.io/apiextensions-apiserver v0.36.4 // indirect
-	k8s.io/apiserver v0.36.4 // indirect
+	k8s.io/apiextensions-apiserver v0.37.0 // indirect
+	k8s.io/apiserver v0.37.0 // indirect
 	k8s.io/cluster-bootstrap v0.36.4 // indirect
 	k8s.io/kube-openapi v0.0.0-20260821135717-be32def86098 // indirect
 	k8s.io/streaming v0.37.0 // indirect
